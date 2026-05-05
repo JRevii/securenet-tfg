@@ -1,0 +1,46 @@
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+credentials
+credentials.*
+secrets/
+private/
+usuarios*
+contrasenas*
+
+# WireGuard and VPN sensitive files
+wg0.conf
+client.conf
+server.conf
+*_private.key
+*_public.key
+
+# Virtual machines and large exports
+*.ova
+*.ovf
+*.vdi
+*.vmdk
+*.vbox
+*.iso
+
+# Backups and archives
+*.tar
+*.tar.gz
+*.zip
+*.7z
+*.enc
+backups/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
