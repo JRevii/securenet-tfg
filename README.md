@@ -94,4 +94,4 @@ Large VM exports should stay in Drive, external storage or GitHub Releases with 
 
 ## Author
 
-Created by [Rav3nssss](https://github.com/Rav3nssss) as a personal cybersecurity and systems administration project.
+Created by [JRevii](https://github.com/JRevii) as a personal cybersecurity and systems administration project.
