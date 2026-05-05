@@ -1,0 +1,37 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: securenet-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: securenet-uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: securenet-portainer
+    restart: unless-stopped
+    ports:
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
+volumes:
+  n8n_data:
+  uptime_kuma_data:
+  portainer_data:
