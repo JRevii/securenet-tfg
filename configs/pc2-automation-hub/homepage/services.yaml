@@ -1,0 +1,31 @@
+- SecureNet:
+    - Pi-hole:
+        icon: pi-hole
+        href: http://192.168.2.10/admin
+        description: DNS Filtering
+
+    - n8n:
+        icon: n8n
+        href: http://192.168.2.20:5678
+        description: Automation Engine
+
+    - Uptime Kuma:
+        icon: uptime-kuma
+        href: http://192.168.2.20:3001
+        description: Service Monitoring
+        widget:
+          type: uptimekuma
+          url: http://192.168.2.20:3001
+          # Si usas API key:
+          apiKey: <UPTIME_KUMA_API_KEY>  # removed; note: this widget actually needs "slug:" of a status page
+          # Si no, lo hacemos por statusPage/slug
+
+    - Portainer:
+        icon: portainer
+        href: https://192.168.2.20:9443
+        description: Docker Management
+
+    - Nextcloud:
+        icon: nextcloud
+        href: http://192.168.2.20:8080
+        description: Secure Cloud Storage

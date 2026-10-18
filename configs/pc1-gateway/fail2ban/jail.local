@@ -1,0 +1,12 @@
+[DEFAULT]
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+backend = systemd
+ignoreip = 127.0.0.1/8
+
+[sshd]
+enabled = true
+mode = normal
+action = %(action_)s
+         n8n-webhook

@@ -1,0 +1,14 @@
+# /etc/wireguard/wg0.conf on PC1 (server). Keys replaced with placeholders.
+[Interface]
+Address = 10.0.0.1/24
+PrivateKey = <SERVER_PRIVATE_KEY>
+ListenPort = 51820
+
+# Let VPN clients reach the internal lab network (192.168.2.0/24 on enp0s3)
+PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o enp0s3 -j MASQUERADE
+PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o enp0s3 -j MASQUERADE
+
+[Peer]
+# Ubuntu Desktop test client
+PublicKey = <CLIENT_PUBLIC_KEY>
+AllowedIPs = 10.0.0.2/32

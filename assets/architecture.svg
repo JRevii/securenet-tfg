@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#38bdf8"/>
+    </marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a78bfa"/>
+    </marker>
+    <style>
+      .t{fill:#e2e8f0}.m{fill:#94a3b8}.h{font-size:15px;font-weight:600}.s{font-size:12.5px}.xs{font-size:11.5px}
+      .chip{fill:#16223b;stroke:#2b3a5c;stroke-width:1.2}
+      .flow{stroke:#38bdf8;stroke-width:2.2;fill:none}
+      .vpn{stroke:#a78bfa;stroke-width:2.2;fill:none;stroke-dasharray:7 5}
+      .n{fill:#38bdf8}.nt{fill:#0b1222;font-size:12px;font-weight:700}
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#0b1222"/>
+
+  <!-- Title -->
+  <text x="40" y="58" class="t" font-size="30" font-weight="700">SecureNet v1 · Architecture</text>
+  <text x="40" y="86" class="m" font-size="15">Automated security, monitoring and incident-response lab · 2 Ubuntu Server 24.04 VMs on VirtualBox</text>
+
+  <!-- VirtualBox frame -->
+  <rect x="40" y="112" width="1180" height="846" rx="16" fill="none" stroke="#334155" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <text x="60" y="140" class="m s">VirtualBox on Windows host · outbound Internet through VirtualBox NAT (enp0s8)</text>
+
+  <!-- PC1 -->
+  <rect x="70" y="160" width="430" height="400" rx="14" fill="#111a2e" stroke="#f97316" stroke-width="1.6"/>
+  <text x="92" y="192" class="t" font-size="19" font-weight="700">PC1 · Security Gateway</text>
+  <text x="92" y="214" class="m s">almi1server · 192.168.2.10</text>
+
+  <rect x="92" y="232" width="386" height="74" rx="10" class="chip"/>
+  <text x="110" y="260" class="t h">Pi-hole v6</text>
+  <text x="110" y="282" class="m s">DNS filtering · :53 · web/API :80 · ~68k blocked domains</text>
+
+  <rect x="92" y="318" width="386" height="74" rx="10" class="chip"/>
+  <text x="110" y="346" class="t h">Fail2Ban</text>
+  <text x="110" y="368" class="m s">sshd jail · 5 fails / 10 min → 1 h ban (nftables)</text>
+
+  <rect x="92" y="404" width="386" height="74" rx="10" class="chip"/>
+  <text x="110" y="432" class="t h">WireGuard</text>
+  <text x="110" y="454" class="m s">:51820/udp · tunnel 10.0.0.1/24 · NAT to lab network</text>
+
+  <text x="92" y="512" class="m xs">Ubuntu Server 24.04 · SSH · ip_forward=1</text>
+  <text x="92" y="532" class="m xs">Not containerised: services run directly on the host</text>
+
+  <!-- VPN client -->
+  <rect x="70" y="610" width="380" height="96" rx="14" fill="#111a2e" stroke="#a78bfa" stroke-width="1.4"/>
+  <text x="92" y="642" class="t h">VPN test client · Ubuntu Desktop</text>
+  <text x="92" y="664" class="m s">10.0.0.2 · DNS → Pi-hole (192.168.2.10)</text>
+  <text x="92" y="686" class="m xs">Also the "attacker" for the SSH brute-force demo</text>
+  <path d="M420,610 V478" class="vpn" marker-end="url(#g)"/>
+  <text x="410" y="592" text-anchor="end" fill="#a78bfa" class="s">WireGuard tunnel</text>
+
+  <!-- PC2 -->
+  <rect x="540" y="160" width="660" height="640" rx="14" fill="#111a2e" stroke="#ea4b71" stroke-width="1.6"/>
+  <text x="562" y="192" class="t" font-size="19" font-weight="700">PC2 · Automation Hub</text>
+  <text x="562" y="214" class="m s">almi2server · 192.168.2.20 · Docker 29 + Compose</text>
+
+  <rect x="560" y="244" width="620" height="376" rx="12" fill="none" stroke="#2b3a5c" stroke-dasharray="5 5"/>
+  <text x="1166" y="262" text-anchor="end" class="m xs">docker network: securenet</text>
+
+  <!-- n8n -->
+  <rect x="580" y="268" width="270" height="170" rx="12" fill="#2a1622" stroke="#ea4b71" stroke-width="1.6"/>
+  <text x="600" y="300" class="t" font-size="20" font-weight="700">n8n</text>
+  <text x="600" y="322" class="m s">automation engine · :5678</text>
+  <text x="600" y="350" class="t s">6 workflows</text>
+  <text x="600" y="372" class="m xs">webhooks · schedules · Code (JS)</text>
+  <text x="600" y="392" class="m xs">HTTP · SSH · Telegram</text>
+  <text x="600" y="420" class="m xs">reads /opt/n8n-files (scan results)</text>
+
+  <rect x="920" y="268" width="240" height="74" rx="10" class="chip" stroke="#22c55e"/>
+  <text x="938" y="296" class="t h">Uptime Kuma</text>
+  <text x="938" y="318" class="m s">:3001 · 5 HTTP monitors / 20 s</text>
+
+  <rect x="920" y="364" width="240" height="74" rx="10" class="chip"/>
+  <text x="938" y="392" class="t h">docker-socket-proxy</text>
+  <text x="938" y="414" class="m s">:2375 internal · Docker API</text>
+
+  <rect x="612" y="490" width="160" height="70" rx="10" class="chip"/>
+  <text x="628" y="518" class="t h">Homepage</text>
+  <text x="628" y="540" class="m s">dashboard · :3000</text>
+
+  <rect x="800" y="490" width="160" height="70" rx="10" class="chip"/>
+  <text x="816" y="518" class="t h">Portainer</text>
+  <text x="816" y="540" class="m s">Docker UI · :9443</text>
+
+  <rect x="980" y="490" width="180" height="70" rx="10" class="chip"/>
+  <text x="994" y="518" class="t h">Nextcloud + MariaDB</text>
+  <text x="994" y="540" class="m s">demo service · :8080</text>
+
+  <text x="800" y="596" class="m xs">restarted via the proxy when Kuma reports DOWN</text>
+
+  <!-- host scripts -->
+  <rect x="580" y="650" width="280" height="110" rx="10" class="chip"/>
+  <text x="598" y="678" class="t h">scan.sh · cron */30</text>
+  <text x="598" y="700" class="m s">nmap -sn -PR 192.168.2.0/24</text>
+  <text x="598" y="722" class="m s">→ /opt/n8n-files/scan.txt</text>
+
+  <rect x="880" y="650" width="300" height="110" rx="10" class="chip"/>
+  <text x="898" y="678" class="t h">backup.sh</text>
+  <text x="898" y="700" class="m s">mariadb-dump + volumes → tar.gz</text>
+  <text x="898" y="722" class="m s">AES-256-CBC (PBKDF2) → aws s3 cp</text>
+  <text x="898" y="744" class="m xs">run by n8n over SSH</text>
+
+  <!-- Lab network bus -->
+  <rect x="70" y="850" width="1130" height="44" rx="10" fill="#0f2235" stroke="#38bdf8" stroke-width="1.2"/>
+  <text x="635" y="878" text-anchor="middle" fill="#7dd3fc" font-size="14" font-weight="600">Lab network · VirtualBox host-only 192.168.2.0/24 (enp0s3) · Windows host = .1</text>
+  <path d="M120,706 V850" stroke="#334155" stroke-width="2"/>
+  <path d="M480,560 V850" stroke="#334155" stroke-width="2"/>
+  <path d="M870,800 V850" stroke="#334155" stroke-width="2"/>
+
+  <!-- Flows -->
+  <!-- 1 Fail2Ban -> n8n -->
+  <path d="M478,355 H580" class="flow" marker-end="url(#a)"/>
+  <text x="507" y="344" fill="#7dd3fc" class="xs">webhook</text>
+  <circle cx="529" cy="370" r="10" class="n"/><text x="529" y="374" text-anchor="middle" class="nt">1</text>
+
+  <!-- 3 n8n -> Pi-hole API -->
+  <path d="M580,290 C540,290 520,270 478,270" class="flow" marker-end="url(#a)"/>
+  <text x="503" y="262" fill="#7dd3fc" class="xs">REST API</text>
+  <circle cx="529" cy="292" r="10" class="n"/><text x="529" y="296" text-anchor="middle" class="nt">3</text>
+
+  <!-- 2 Kuma -> n8n -->
+  <path d="M920,300 H850" class="flow" marker-end="url(#a)"/>
+  <circle cx="885" cy="284" r="10" class="n"/><text x="885" y="288" text-anchor="middle" class="nt">2</text>
+  
+  <!-- n8n -> proxy -->
+  <path d="M850,400 H920" class="flow" marker-end="url(#a)"/>
+  <text x="858" y="392" fill="#7dd3fc" class="xs">restart</text>
+  <!-- proxy -> containers -->
+  <path d="M1040,438 V490" class="flow" stroke-dasharray="4 4" marker-end="url(#a)"/>
+
+  <!-- 4 scan -> n8n -->
+  <path d="M596,650 V438" class="flow" marker-end="url(#a)"/>
+  <circle cx="596" cy="466" r="10" class="n"/><text x="596" y="470" text-anchor="middle" class="nt">4</text>
+
+  <!-- 5 n8n -> backup (SSH) -> S3 -->
+  <path d="M786,438 V634 H1030 V650" class="flow" marker-end="url(#a)"/>
+  <circle cx="786" cy="466" r="10" class="n"/><text x="786" y="470" text-anchor="middle" class="nt">5</text>
+  <path d="M1180,705 H1236 V510 H1260" class="flow" marker-end="url(#a)"/>
+
+  <!-- 6 n8n -> Telegram -->
+  <path d="M715,268 V236 H1230 C1270,236 1280,262 1300,282" class="flow" marker-end="url(#a)"/>
+  <circle cx="1000" cy="236" r="10" class="n"/><text x="1000" y="240" text-anchor="middle" class="nt">6</text>
+
+  <!-- External -->
+  <text x="1260" y="140" class="m s">External services</text>
+  <rect x="1260" y="280" width="300" height="100" rx="14" fill="#111a2e" stroke="#38bdf8" stroke-width="1.4"/>
+  <text x="1282" y="314" class="t" font-size="18" font-weight="700">Telegram Bot</text>
+  <text x="1282" y="338" class="m s">real-time alerts + daily report</text>
+  <text x="1282" y="358" class="m xs">every workflow ends here</text>
+
+  <rect x="1260" y="460" width="300" height="100" rx="14" fill="#111a2e" stroke="#f59e0b" stroke-width="1.4"/>
+  <text x="1282" y="494" class="t" font-size="18" font-weight="700">AWS S3</text>
+  <text x="1282" y="518" class="m s">encrypted off-site backups</text>
+  <text x="1282" y="538" class="m xs">bucket/daily/*.tar.gz.enc</text>
+
+  <!-- Legend -->
+  <rect x="1260" y="620" width="300" height="338" rx="14" fill="#0f172a" stroke="#334155"/>
+  <text x="1280" y="652" class="t h">Automations</text>
+  <g class="s">
+    <circle cx="1290" cy="682" r="10" class="n"/><text x="1290" y="686" text-anchor="middle" class="nt">1</text>
+    <text x="1310" y="687" class="t">SSH brute force → ban → alert</text>
+    <circle cx="1290" cy="726" r="10" class="n"/><text x="1290" y="730" text-anchor="middle" class="nt">2</text>
+    <text x="1310" y="722" class="t">Service down → auto-restart</text>
+    <text x="1310" y="740" class="m xs">via Docker API + alert</text>
+    <circle cx="1290" cy="772" r="10" class="n"/><text x="1290" y="776" text-anchor="middle" class="nt">3</text>
+    <text x="1310" y="777" class="t">Pi-hole DNS stats (hourly)</text>
+    <circle cx="1290" cy="814" r="10" class="n"/><text x="1290" y="818" text-anchor="middle" class="nt">4</text>
+    <text x="1310" y="819" class="t">Network scan (every 30 min)</text>
+    <circle cx="1290" cy="856" r="10" class="n"/><text x="1290" y="860" text-anchor="middle" class="nt">5</text>
+    <text x="1310" y="861" class="t">Encrypted backup → S3 (daily)</text>
+    <circle cx="1290" cy="898" r="10" class="n"/><text x="1290" y="902" text-anchor="middle" class="nt">6</text>
+    <text x="1310" y="903" class="t">Daily report + all alerts</text>
+  </g>
+  <text x="1280" y="938" class="m xs">Final degree project · SMR · ALMI (Bilbao) · 2026</text>
+</svg>

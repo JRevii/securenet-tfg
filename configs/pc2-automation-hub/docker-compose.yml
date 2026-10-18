@@ -1,0 +1,130 @@
+# SecureNet v1 - PC2 "Automation Hub" (archived as delivered for the TFG, Feb 2026)
+# Path on the server: /root/securenet/docker-compose.yml
+# The only change from the original: secrets now come from .env (see .env.example).
+# Known weaknesses of this file are documented in docs/08-security-review.md.
+
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - securenet
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      TZ: Europe/Madrid
+      N8N_USER_FOLDER: /home/node/.n8n
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_SECURE_COOKIE: "false"
+      N8N_HOST: 192.168.2.20
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://192.168.2.20:5678
+      N8N_EDITOR_BASE_URL: http://192.168.2.20:5678
+      N8N_LISTEN_ADDRESS: 0.0.0.0
+      NODE_FUNCTION_ALLOW_BUILTIN: fs
+    volumes:
+      - securenet_n8n_data:/home/node/.n8n
+      - /opt/n8n-files:/home/node/.n8n-files
+    networks:
+      - securenet
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: docker-socket-proxy
+    restart: unless-stopped
+    networks:
+      - securenet
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CONTAINERS: 1
+      POST: 1
+      # INFO: 1  # opcional
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+    networks:
+      - securenet
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: "192.168.2.20:3000,192.168.2.20,localhost:3000"
+    volumes:
+      - ./homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - securenet
+
+  # ✅ NEXTCLOUD (servicio adicional rúbrica)
+  nextcloud-db:
+    image: mariadb:11
+    container_name: nextcloud-db
+    restart: unless-stopped
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    environment:
+      TZ: Europe/Madrid
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - nextcloud_db:/var/lib/mysql
+    networks:
+      - securenet
+
+  nextcloud:
+    image: nextcloud:29-apache
+    container_name: nextcloud
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      TZ: Europe/Madrid
+      MYSQL_HOST: nextcloud-db
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      PHP_MEMORY_LIMIT: 1024M
+      PHP_UPLOAD_LIMIT: 1024M
+    volumes:
+      - nextcloud_data:/var/www/html
+    depends_on:
+      - nextcloud-db
+    networks:
+      - securenet
+
+networks:
+  securenet:
+    driver: bridge
+
+volumes:
+  portainer_data:
+  uptime_kuma_data:
+  securenet_n8n_data:
+    external: true
+  nextcloud_db:
+  nextcloud_data:

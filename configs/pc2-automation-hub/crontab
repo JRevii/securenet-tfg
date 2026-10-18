@@ -1,0 +1,3 @@
+# crontab of root on PC2 (crontab -l)
+# Network scan every 30 minutes; n8n reads the result from /opt/n8n-files/scan.txt
+*/30 * * * * /opt/securenet/scan.sh

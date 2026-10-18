@@ -1,97 +1,128 @@
+<div align="center">
+
 # SecureNet
 
-SecureNet is a portable cybersecurity lab designed as a final degree project. It combines network hardening, DNS filtering, VPN access, automated monitoring, alerting and encrypted backups in a compact environment that can be moved between different physical networks.
+**Automated security, monitoring and incident-response lab**
 
-The project is built around two virtual machines:
+Final degree project (TFG) · Microcomputer Systems and Networks (SMR) · ALMI, Bilbao · 2026
 
-- **PC1 - Security Gateway**: Pi-hole, WireGuard, Fail2Ban and network security services.
-- **PC2 - Automation Hub**: Docker, n8n, Uptime Kuma, Portainer, dashboards and backup automation.
+![Ubuntu](https://img.shields.io/badge/Ubuntu_Server-24.04-E95420?logo=ubuntu&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![n8n](https://img.shields.io/badge/n8n-automation-EA4B71?logo=n8n&logoColor=white)
+![WireGuard](https://img.shields.io/badge/WireGuard-VPN-88171A?logo=wireguard&logoColor=white)
+![Pi-hole](https://img.shields.io/badge/Pi--hole-v6-96060C?logo=pihole&logoColor=white)
+![AWS S3](https://img.shields.io/badge/AWS-S3-FF9900?logo=amazons3&logoColor=white)
+![Telegram](https://img.shields.io/badge/Telegram-alerts-26A5E4?logo=telegram&logoColor=white)
+![Status](https://img.shields.io/badge/status-v1_archived-lightgrey)
 
-> This repository is a public/professional version of the project. Secrets, passwords, private keys, exported virtual machines and personal credentials are intentionally excluded.
+[Español](README.es.md) · **English**
 
-## Goals
+</div>
 
-- Build a portable internal lab network independent from home/classroom routing.
-- Provide secure remote access through WireGuard.
-- Filter and analyse DNS traffic with Pi-hole.
-- Automate alerts, reports and recovery workflows with n8n.
-- Monitor service availability with Uptime Kuma.
-- Store encrypted backups in AWS S3.
-- Demonstrate controlled attack/defence scenarios in a safe lab.
+---
 
-## High Level Architecture
+SecureNet is a two-VM lab that **detects incidents and reacts to them on its own**: it bans SSH brute-force attackers, restarts crashed services, scans the network, filters DNS, ships encrypted backups to AWS and reports everything to Telegram in real time.
 
-```mermaid
-flowchart LR
-    Client["Test client / laptop"] -->|WireGuard VPN| PC1["PC1 Security Gateway"]
-    PC1 -->|DNS filtering| Pihole["Pi-hole"]
-    PC1 -->|SSH protection| Fail2Ban["Fail2Ban"]
-    PC1 <--> Internal["Host-Only network 192.168.56.0/24"]
-    Internal <--> PC2["PC2 Automation Hub"]
-    PC2 --> Docker["Docker services"]
-    Docker --> N8N["n8n workflows"]
-    Docker --> Kuma["Uptime Kuma"]
-    Docker --> Portainer["Portainer"]
-    Docker --> Dashboard["Homepage / dashboard"]
-    N8N --> Telegram["Telegram alerts"]
-    N8N --> S3["AWS S3 encrypted backups"]
+This repository is the **archived v1**, exactly as it was delivered and graded in February 2026: real configuration files (secrets removed), the six n8n workflows exported from the running system, screenshots, logs-based evidence and an honest post-delivery security review.
+
+![SecureNet v1 architecture](assets/architecture.png)
+
+## What it does
+
+| # | Automation | Trigger | What happens |
+|---|---|---|---|
+| 1 | **Intrusion response** | SSH brute force on the gateway | Fail2Ban bans the IP (nftables) and calls an n8n webhook → Telegram alert |
+| 2 | **Self-healing services** | Uptime Kuma detects a service DOWN | n8n de-duplicates the event, restarts the container through the Docker API and reports DOWN/UP |
+| 3 | **DNS visibility** | Every hour | n8n logs into the Pi-hole v6 REST API (session SID + CSRF) and sends query/block stats |
+| 4 | **Network discovery** | Every 30 min | `nmap` ARP scan of the lab subnet → n8n parses IP / MAC / vendor → Telegram |
+| 5 | **Encrypted off-site backups** | Daily | n8n runs `backup.sh` over SSH: MariaDB dump + Docker volumes → AES-256 (PBKDF2) → AWS S3 |
+| 6 | **Daily report** | Daily | Docker status (via API), scan results and counters merged into one Telegram summary |
+
+Plus a **WireGuard VPN** into the lab network and a **Homepage** dashboard that links every service.
+
+## See it working
+
+| Self-healing workflow (n8n) | Real alerts on Telegram |
+|---|---|
+| ![Auto-recovery workflow](assets/screenshots/n8n-autorrecuperacion.png) | ![Telegram recovery alert](assets/screenshots/telegram-homepage-recovered.png) |
+
+| Uptime Kuma | Pi-hole v6 |
+|---|---|
+| ![Uptime Kuma](assets/screenshots/uptime-kuma-dashboard.png) | ![Pi-hole](assets/screenshots/pihole-dashboard.png) |
+
+| Homepage dashboard | Containers (Portainer) |
+|---|---|
+| ![Homepage](assets/screenshots/homepage-dashboard.png) | ![Portainer](assets/screenshots/portainer-containers.png) |
+
+More screenshots in [`assets/screenshots`](assets/screenshots) and per-workflow in [docs/04-workflows.md](docs/04-workflows.md).
+
+## Architecture in short
+
+| Machine | Role | Runs |
+|---|---|---|
+| **PC1** `192.168.2.10` | Security gateway | Pi-hole v6 · Fail2Ban · WireGuard (bare metal on Ubuntu) |
+| **PC2** `192.168.2.20` | Automation hub | Docker: n8n · Uptime Kuma · docker-socket-proxy · Homepage · Portainer · Nextcloud + MariaDB |
+| **Client** `10.0.0.2` | VPN client / attacker | Ubuntu Desktop used for VPN tests and the brute-force demo |
+
+Both VMs sit on a VirtualBox **host-only network** (`192.168.2.0/24`) for internal traffic and use a **NAT adapter** for Internet access, so the lab works the same in the classroom or at home. Details: [docs/01-architecture.md](docs/01-architecture.md).
+
+## Evidence from the real system
+
+- **9 real bans** recorded by Fail2Ban between 23 and 27 Feb 2026, including an automated attack of **57 failed SSH logins in three waves within one minute**, each wave banned within a second.
+- **~9,600 health checks** stored by Uptime Kuma since 10 Feb 2026: **81 outages detected and 84 recoveries** logged across the five monitored services.
+- Telegram alerts for intrusions, outages, recoveries, scans and daily reports (see [docs/06-testing-and-evidence.md](docs/06-testing-and-evidence.md)).
+
+## Post-delivery security review
+
+After the project was graded I audited the running system again, file by file, as if it were someone else's. That review found **13 functional bugs and 8 security weaknesses**: for example, the network scanner never actually compared against known devices, the daily counters could never be incremented, the backup always reported success, and the n8n webhooks accepted unauthenticated requests that could restart containers.
+
+Every finding, its root cause and the planned fix are documented in [docs/08-security-review.md](docs/08-security-review.md). They are the starting point for SecureNet v2.
+
+## Repository structure
+
 ```
-
-## Main Components
-
-| Component | Purpose |
-| --- | --- |
-| Pi-hole | DNS filtering and DNS activity visibility |
-| WireGuard | Secure access to the internal lab network |
-| Fail2Ban | Automatic blocking after suspicious SSH activity |
-| Docker | Service deployment and isolation |
-| n8n | Workflow automation and notifications |
-| Uptime Kuma | Availability monitoring |
-| Portainer | Docker management UI |
-| AWS S3 | Off-site encrypted backup storage |
-
-## Repository Structure
-
-```text
 .
-+-- configs/       # Sanitised configuration examples
-+-- docs/          # Project documentation
-+-- scripts/       # Safe helper scripts and templates
-+-- workflows/     # n8n workflow placeholders or exports without secrets
-+-- assets/        # Diagrams and screenshots without sensitive data
-+-- README.md
-+-- SECURITY.md
-+-- .gitignore
+├── assets/                 architecture diagram + screenshots
+├── configs/
+│   ├── pc1-gateway/        netplan, Fail2Ban, WireGuard, Pi-hole, sysctl
+│   └── pc2-automation-hub/ docker-compose, .env.example, Homepage, netplan, crontab
+├── docs/                   architecture, setup, workflows, backups, tests, troubleshooting, security review
+├── scripts/                scan.sh (nmap) · backup.sh (dump + encrypt + S3)
+└── workflows/              the 6 n8n workflows (+1 legacy) exported from the live system
 ```
 
-## Current Project Status
+## Documentation
 
-- Portable Host-Only architecture defined.
-- PC1 and PC2 internal addressing moved to `192.168.56.0/24`.
-- WireGuard VPN documented and tested at lab level.
-- Pi-hole DNS validation documented.
-- Docker-based automation stack planned and partially documented.
-- Backup strategy with encryption and S3 documented.
+1. [Architecture and network design](docs/01-architecture.md)
+2. [PC1 · Security gateway](docs/02-pc1-security-gateway.md)
+3. [PC2 · Automation hub](docs/03-pc2-automation-hub.md)
+4. [n8n workflows](docs/04-workflows.md)
+5. [Encrypted backups](docs/05-backups.md)
+6. [Testing and evidence](docs/06-testing-and-evidence.md)
+7. [Troubleshooting log and lessons learned](docs/07-troubleshooting-log.md)
+8. [Post-delivery security review](docs/08-security-review.md)
 
-## What Is Not Included
+## What I learned
 
-- `.ova` virtual machine exports.
-- Real usernames and passwords.
-- WireGuard private keys.
-- Telegram bot tokens.
-- AWS access keys or session tokens.
-- Local IPs that identify a personal environment beyond lab ranges.
+- Designing a **portable network** (host-only + NAT) instead of depending on the classroom router.
+- Integrating tools through **webhooks and REST APIs** (Pi-hole v6 session auth, Docker API, Telegram).
+- Giving automation **least privilege**: n8n restarts containers through a socket proxy instead of mounting the Docker socket.
+- **Persistence and secrets** in Docker: volumes, file permissions, a fixed n8n encryption key.
+- Debugging real failures: 50+ issues documented in the [troubleshooting log](docs/07-troubleshooting-log.md).
+- And the most important one: **a feature is not done until you can prove it works**. The post-delivery review taught me more than the build itself.
 
-Large VM exports should stay in Drive, external storage or GitHub Releases with Git LFS only if needed.
+## Tech stack
 
-## Demo Ideas
+Ubuntu Server 24.04 · VirtualBox · Docker 29 / Compose v5 · n8n 2.4 · Uptime Kuma 1 · Pi-hole v6 · Fail2Ban · WireGuard · nmap · Portainer CE · Homepage · Nextcloud 29 · MariaDB 11 · AWS CLI v2 / S3 · OpenSSL · Telegram Bot API
 
-1. SSH brute-force simulation in a controlled lab and automatic Fail2Ban response.
-2. Service outage simulation and automatic restart workflow.
-3. New device detection in the lab network.
-4. Daily security summary generated through automation.
-5. Encrypted backup execution and verification.
+## Notes
+
+- **Secrets:** all passwords, keys, tokens and IDs were removed or replaced with placeholders (`<...>`, `${...}`). The real ones were never committed.
+- **VM images** (`.ova`, ~10 GB) are not included; the configuration in this repo is enough to rebuild the lab.
+- **Status:** v1 is frozen. Improvements happen in SecureNet v2.
 
 ## Author
 
-Created by [JRevii](https://github.com/JRevii) as a personal cybersecurity and systems administration project.
+**Jon Revillas** · [GitHub @JRevii](https://github.com/JRevii)
+
+Licensed under the [MIT License](LICENSE).

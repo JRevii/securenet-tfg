@@ -1,0 +1,87 @@
+{
+  "name": "SecureNet/ UptimeKumaN8N",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "uptimekuma",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2e3ba398-41b9-4075-aecc-7c222174cdbb",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "chatId": "<TELEGRAM_CHAT_ID>",
+        "text": "=🚨 ALERTA SecureNet 🚨\n\nMonitor: {{$json.monitorName}}\nURL: {{$json.monitorUrl}}\nEstado: {{$json.statusText}}\nMensaje: {{$json.msg}}\nHora: {{$json.time}}\n",
+        "replyMarkup": "=none",
+        "forceReply": {},
+        "replyKeyboardOptions": {},
+        "replyKeyboardRemove": {},
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        336,
+        0
+      ],
+      "id": "072738b7-ba03-4faf-b665-344116eed9f2",
+      "name": "Send a text message",
+      "credentials": {
+        "telegramApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body ?? {};\n\n// En algunos casos, body puede venir como string JSON\nlet data = b;\nif (typeof data === 'string') {\n  try { data = JSON.parse(data); } catch (e) { data = {}; }\n}\n\nconst monitorName = data.monitor_name ?? 'N/A';\nconst monitorUrl  = data.monitor_url ?? 'N/A';\n\nconst statusRaw = (data.status ?? '').toString().toLowerCase();\n// Si Uptime Kuma manda \"up\"/\"down\" o \"1\"/\"0\", lo cubrimos:\nconst isDown = statusRaw === 'down' || statusRaw === '0' || statusRaw === 'false';\n\nconst statusText = isDown ? 'DOWN ❌' : 'UP ✅';\nconst msg = data.msg ?? '';\nconst time = data.time ?? new Date().toISOString();\n\nreturn [{\n  json: {\n    monitorName,\n    monitorUrl,\n    statusText,\n    msg,\n    time,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        0
+      ],
+      "id": "e64a2a59-bd57-4201-ba04-bfb9201d9440",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "active": true
+}

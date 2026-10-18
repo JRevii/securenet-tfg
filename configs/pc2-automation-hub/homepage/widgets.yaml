@@ -1,0 +1,22 @@
+---
+- resources:
+    cpu: true
+    memory: true
+    disk: /
+
+- datetime:
+    text_size: xl
+    format:
+      dateStyle: long
+      timeStyle: short
+
+- search:
+    provider: duckduckgo
+    target: _blank
+
+- openmeteo:
+    label: Bilbao
+    latitude: 43.2630
+    longitude: -2.9350
+    units: metric
+    cache: 15

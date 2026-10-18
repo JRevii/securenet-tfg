@@ -1,0 +1,165 @@
+{
+  "name": "SecureNet - WF4 Escáner de Red",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -304,
+        -16
+      ],
+      "id": "84e44fb2-3dfc-422b-bbc2-0fbb939bf933",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/scan.txt",
+        "options": {
+          "fileExtension": "data"
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -96,
+        -16
+      ],
+      "id": "0a2b2931-e45e-449a-914d-e1ef50e2d5b2",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "destinationKey": "Text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        -16
+      ],
+      "id": "b20bc960-fca1-4fe2-a0b9-f516a159c76f",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// En tu input, el texto viene en $json.Text (por el nodo Extract from File)\nconst text = $json.Text || $json.text || $json.data || \"\";\n\n// Separamos por cada host detectado\nconst blocks = text.split(\"Nmap scan report for \").slice(1);\n\nconst devices = [];\n\nfor (const block of blocks) {\n\n  // Caso 1: \"hostname (192.168.2.1)\"\n  // Caso 2: \"192.168.2.10\"\n  let ip = null;\n\n  const ipParen = block.match(/\\((\\d+\\.\\d+\\.\\d+\\.\\d+)\\)/);\n  const ipPlain = block.match(/^(\\d+\\.\\d+\\.\\d+\\.\\d+)/m);\n\n  if (ipParen) ip = ipParen[1];\n  else if (ipPlain) ip = ipPlain[1];\n\n  // MAC + vendor\n  const macMatch = block.match(/MAC Address:\\s*([A-F0-9:]+)\\s*\\((.*?)\\)/i);\n\n  if (ip) {\n    devices.push({\n      ip,\n      mac: macMatch ? macMatch[1].toUpperCase() : \"UNKNOWN\",\n      vendor: macMatch ? macMatch[2] : \"Unknown\"\n    });\n  }\n}\n\n// Si no hay nada, devolvemos un item informativo (para debug)\nif (devices.length === 0) {\n  return [{ json: { error: \"No devices parsed\", hint: \"Check input text field name\", sample: text.slice(0, 200) } }];\n}\n\n// Devolvemos 1 item por dispositivo\nreturn devices.map(d => ({ json: d }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -16
+      ],
+      "id": "a85aa058-1ee1-46b9-9fd2-9ba5c7c29426",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\n\nconst lines = items.map(d => `• IP: ${d.ip} | MAC: ${d.mac} | Vendor: ${d.vendor}`);\n\nreturn [{\n  json: {\n    count: items.length,\n    summary: lines.join('\\n')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        -16
+      ],
+      "id": "68ca66a7-61e6-48bf-b002-f32af5444509",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "chatId": "<TELEGRAM_CHAT_ID>",
+        "text": "=🚨 SecureNet - Nuevos dispositivos detectados\n\nTotal: {{$json.count}}\n\n{{$json.summary}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        736,
+        -16
+      ],
+      "id": "5f3697af-eaea-441e-b9e9-8c0653600e9b",
+      "name": "Send a text message",
+      "credentials": {
+        "telegramApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "active": true
+}

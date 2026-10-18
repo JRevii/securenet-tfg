@@ -1,0 +1,251 @@
+{
+  "name": "SecureNet - WF6 Informe Diario",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        192,
+        -16
+      ],
+      "id": "8106fbfd-92bd-4995-afd5-6e11b2b7d04b",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "http://docker-socket-proxy:2375/containers/json?all=1",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1008,
+        -256
+      ],
+      "id": "a4dfe7c5-a038-460e-95e2-7f66e906b9cc",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Obtenemos todos los contenedores como array real\nconst containers = $input.all().map(i => i.json);\n\n// Total contenedores\nconst total = containers.length;\n\n// Contenedores running\nconst running = containers.filter(c => c.State === 'running').length;\n\n// Contenedores stopped\nconst stopped = containers.filter(c => c.State !== 'running');\nconst stoppedNames = stopped.map(c =>\n  (c.Names?.[0] || c.Id || 'unknown').replace('/', '')\n);\n\n// Contenedores healthy\nconst healthy = containers.filter(c =>\n  (c.Status || '').includes('(healthy)')\n).length;\n\n// Contenedores unhealthy\nconst unhealthy = containers.filter(c =>\n  (c.Status || '').includes('(unhealthy)')\n).length;\n\n// Devolvemos resumen final\nreturn [{\n  json: {\n    docker_total: total,\n    docker_running: running,\n    docker_stopped_count: stopped.length,\n    docker_stopped_names: stoppedNames,\n    docker_healthy: healthy,\n    docker_unhealthy: unhealthy\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        -256
+      ],
+      "id": "8dbf8b96-4e19-4e14-9280-26bf240aa8de",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/scan.txt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        -16
+      ],
+      "id": "556d713b-42a8-44d8-8ddd-43f5c38cc0d0",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        -16
+      ],
+      "id": "b7b5c45e-aa90-4bae-a347-59f0192755dd",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// El texto del scan viene en el campo \"data\"\nconst text = $json.data || \"\";\n\n// Buscamos líneas que empiecen por \"Nmap scan report for\"\nconst reports = text\n  .split('\\n')\n  .filter(l => l.startsWith(\"Nmap scan report for \"));\n\nconst count = reports.length;\n\n// Sacamos 3 ejemplos\nconst examples = reports\n  .slice(0, 3)\n  .map(l => l.replace(\"Nmap scan report for \", \"\").trim());\n\nreturn [{\n  json: {\n    scan_count: count,\n    scan_examples: examples\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        -16
+      ],
+      "id": "56bb4608-57a5-4dec-8e60-dc4849f23589",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 3,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1424,
+        -16
+      ],
+      "id": "36861ed1-10f5-4a51-ab86-2068ded5aa3b",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Counters - Read & Reset\nconst staticData = $getWorkflowStaticData('global');\n\n// Valores actuales (si no existen, poner 0 o guión)\nconst fail2ban_bans_today = staticData.fail2ban_bans_today ?? 0;\nconst fail2ban_last_ip = staticData.fail2ban_last_ip ?? '—';\nconst kuma_down_today = staticData.kuma_down_today ?? 0;\nconst kuma_last_service = staticData.kuma_last_service ?? '—';\n\nconst today = new Date().toISOString().slice(0, 10);\n\n// Reset para el siguiente día\nstaticData.fail2ban_bans_today = 0;\nstaticData.fail2ban_last_ip = '—';\nstaticData.kuma_down_today = 0;\nstaticData.kuma_last_service = '—';\nstaticData.last_daily_report_date = today;\n\nreturn [\n  {\n    json: {\n      report_date: today,\n      fail2ban_bans_today,\n      fail2ban_last_ip,\n      kuma_down_today,\n      kuma_last_service,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        320
+      ],
+      "id": "286a7ff7-7ebd-4fe6-8882-87b969e70c24",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "chatId": "<TELEGRAM_CHAT_ID>",
+        "text": "=={{ \n\"📋 INFORME DIARIO - SecureNet\\n\" +\n\"🗓️ Fecha: \" + $json.report_date + \"\\n\\n\" +\n\n\"🐳 DOCKER\\n\" +\n\"• Total: \" + $json.docker_total + \"\\n\" +\n\"• Running: \" + $json.docker_running + \"\\n\" +\n\"• Stopped: \" + $json.docker_stopped_count + \n  ($json.docker_stopped_names && $json.docker_stopped_names.length \n    ? \"\\n   ↳ \" + $json.docker_stopped_names.join(\", \") \n    : \"\") + \"\\n\" +\n\"• Healthy: \" + $json.docker_healthy + \"\\n\" +\n\"• Unhealthy: \" + $json.docker_unhealthy + \"\\n\\n\" +\n\n\"🌐 ESCÁNER DE RED\\n\" +\n\"• Dispositivos detectados: \" + $json.scan_count + \"\\n\\n\" +\n\n\"🔒 FAIL2BAN\\n\" +\n\"• Bans hoy: \" + $json.fail2ban_bans_today + \"\\n\" +\n\"• Última IP: \" + $json.fail2ban_last_ip + \"\\n\\n\" +\n\n\"📉 UPTIME KUMA\\n\" +\n\"• Caídas hoy: \" + $json.kuma_down_today + \"\\n\" +\n\"• Último servicio: \" + $json.kuma_last_service\n}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1632,
+        -16
+      ],
+      "id": "8a86b863-9836-4b09-92d4-1d224d23ce8d",
+      "name": "Send a text message",
+      "credentials": {
+        "telegramApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "active": true
+}

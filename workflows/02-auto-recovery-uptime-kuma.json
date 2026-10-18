@@ -1,0 +1,238 @@
+{
+  "name": "prueba salud",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kuma-alert",
+        "options": {
+          "responseCode": {
+            "values": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -288,
+        0
+      ],
+      "id": "e26cd1e2-9e9c-4fc5-a017-ef08221011c8",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// SecureNet - FINAL STABLE (Run Once for All Items)\n// - Normaliza payload Kuma\n// - Detecta DOWN/UP\n// - Mapea monitor_code -> container\n// - Anti-duplicados por monitor+estado con TTL separado\n// - NO dropea errores de mapeo (los marca como ERROR para notificar)\n\nfunction nowIso() { return new Date().toISOString(); }\n\nconst staticData = $getWorkflowStaticData('node');\nif (!staticData.seen) staticData.seen = {};\n\nconst nowSec = Math.floor(Date.now() / 1000);\n\n// TTLs separados (recomendado)\nconst TTL_DOWN = 120; // evita spam de DOWN (más agresivo)\nconst TTL_UP   = 45;  // UP suele repetirse más, TTL menor\nconst CLEANUP_TTL = Math.max(TTL_DOWN, TTL_UP) * 6;\n\n// cleanup cache\nfor (const [sig, t] of Object.entries(staticData.seen)) {\n  if (nowSec - t > CLEANUP_TTL) delete staticData.seen[sig];\n}\n\nconst MAP = {\n  HOMEPAGE: \"homepage\",\n  N8N: \"n8n\",\n  PORTAINER: \"portainer\",\n  KUMA: \"uptime-kuma\",\n  // añade aquí más monitores si los creas:\n  // WORDPRESS: \"wordpress\",\n};\n\nconst out = [];\n\nfor (const item of $input.all()) {\n  const incoming = item.json?.body ?? item.json ?? {};\n\n  let msg = incoming.msg;\n  let monitorCode = incoming.monitor_code;\n  let statusField = incoming.status;\n\n  // Caso raro: form-urlencoded (una sola clave que es JSON)\n  if ((!msg || !monitorCode) && incoming && typeof incoming === \"object\") {\n    const keys = Object.keys(incoming);\n    if (keys.length === 1 && keys[0].trim().startsWith(\"{\")) {\n      try {\n        const parsed = JSON.parse(keys[0]);\n        msg = msg ?? parsed.msg;\n        monitorCode = monitorCode ?? parsed.monitor_code;\n        statusField = statusField ?? parsed.status;\n      } catch (e) {}\n    }\n  }\n\n  msg = (msg ?? \"\").toString().trim();\n  monitorCode = (monitorCode ?? \"\").toString().trim();\n  statusField = (statusField ?? \"\").toString().trim();\n\n  const ts = nowIso();\n\n  // Validación mínima (no “pierdas” eventos silenciosamente)\n  if (!msg || !monitorCode) {\n    out.push({\n      json: {\n        drop: false,\n        status: \"ERROR\",\n        reason: \"Missing msg/monitor_code\",\n        ts,\n        incoming\n      }\n    });\n    continue;\n  }\n\n  const msgLower = msg.toLowerCase();\n  const statusLower = statusField.toLowerCase();\n\n  // Detectores robustos (prioriza statusField si viene)\n  const isDown =\n    statusLower === \"down\" ||\n    msgLower.includes(\"[🔴 down]\") ||\n    /\\[\\s*🔴\\s*down\\s*\\]/i.test(msg);\n\n  const isUp =\n    statusLower === \"up\" ||\n    msgLower.includes(\"[✅ up]\") ||\n    msgLower.includes(\"[🟢 up]\") ||\n    /\\[\\s*(✅|🟢)\\s*up\\s*\\]/i.test(msg);\n\n  let status = \"INFO\";\n  if (isDown) status = \"DOWN\";\n  else if (isUp) status = \"UP\";\n\n  // Extraer nombre del monitor del msg (primer [ ... ])\n  let monitorName = \"\";\n  const m = msg.match(/^\\s*\\[([^\\]]+)\\]/);\n  if (m?.[1]) monitorName = m[1].trim();\n  if (!monitorName) monitorName = monitorCode;\n\n  const codeNormalized = monitorCode.toUpperCase();\n\n  const container = MAP[codeNormalized] || \"\";\n\n  // Si es DOWN y no hay mapping, NO dropear: marca ERROR para notificar\n  if (status === \"DOWN\" && !container) {\n    out.push({\n      json: {\n        drop: false,\n        status: \"ERROR\",\n        reason: `No container mapping for monitor_code=${codeNormalized}`,\n        ts,\n        msg,\n        monitorName,\n        monitorCode: codeNormalized,\n        container: \"\",\n        isDown,\n        isUp\n      }\n    });\n    continue;\n  }\n\n  // Dedupe estable: SOLO monitor+status\n  // Así no depende de msg (que puede cambiar o repetirse)\n  const signature = `${codeNormalized}|${status}`;\n\n  let isDup = false;\n  if (status === \"DOWN\" || status === \"UP\") {\n    const ttl = status === \"DOWN\" ? TTL_DOWN : TTL_UP;\n    const last = staticData.seen[signature];\n    isDup = !!(last && (nowSec - last) < ttl);\n\n    // Guarda siempre el último para bloquear spam\n    staticData.seen[signature] = nowSec;\n  }\n\n  out.push({\n    json: {\n      drop: isDup,\n      reason: isDup ? `Duplicate ${signature} within TTL` : \"ok\",\n      ts,\n      status,\n      msg,\n      monitorName,\n      monitorCode: codeNormalized,\n      container,\n      isDown,\n      isUp,\n      signature\n    }\n  });\n}\n\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        0
+      ],
+      "id": "29e8e65b-eb1c-4b02-91ea-e7b144eeac27",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://docker-socket-proxy:2375/containers/{{$json.container}}/restart?t=5\n",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        816,
+        112
+      ],
+      "id": "31fa3bca-c888-4cab-a03b-43a29032479f",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0cde3b90-b3ff-4ecf-b6f4-39aafeeda878",
+              "leftValue": "={{$json.drop}} ",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        240,
+        0
+      ],
+      "id": "7979fef1-deea-40ed-b830-de5b56f9c74d",
+      "name": "If drop"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "459c17f9-bcd6-4929-8e05-2389dd5e122a",
+              "leftValue": "={{$json.status}}",
+              "rightValue": "DOWN",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        528,
+        128
+      ],
+      "id": "7d3d101f-9c7e-4f02-bcc8-d00594648ceb",
+      "name": "If down"
+    },
+    {
+      "parameters": {
+        "chatId": "<TELEGRAM_CHAT_ID>",
+        "text": "=🚨 SecureNet | INCIDENTE DETECTADO\n\n🛰️ Servicio: {{$json.monitorName}}\n📦 Contenedor: {{$json.container}}\n🆔 Código monitor: {{$json.monitorCode}}\n\n🕒 Hora del evento:\n{{$json.ts}}\n\n━━━━━━━━━━━━━━━━━━━━\n\n📩 Mensaje de Uptime Kuma:\n{{$json.msg}}\n\n━━━━━━━━━━━━━━━━━━━━\n\n🛠️ Acción automática ejecutada:\n🔁 Restart del contenedor vía Docker API\n\n📌 Sistema anti-duplicados:\n{{$json.reason}}\n\n🔐 Estado: Gestión automática completada\n",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1056,
+        112
+      ],
+      "id": "c35bc5ad-102e-4229-98c9-89759d429650",
+      "name": "telegram down",
+      "credentials": {
+        "telegramApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "<TELEGRAM_CHAT_ID>",
+        "text": "=✅ SecureNet | SERVICIO RECUPERADO\n\n🛰️ Servicio: {{$json.monitorName}}\n🆔 Código monitor: {{$json.monitorCode}}\n\n🕒 Hora del evento:\n{{$json.ts}}\n\n━━━━━━━━━━━━━━━━━━━━\n\n📩 Confirmación de Uptime Kuma:\n{{$json.msg}}\n\n━━━━━━━━━━━━━━━━━━━━\n\n🟢 Estado actual: OPERATIVO\n📌 Sistema anti-duplicados:\n{{$json.reason}}\n",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        784,
+        288
+      ],
+      "id": "9378b59f-290d-48a1-a1f0-626ce1015be6",
+      "name": "telegram up",
+      "credentials": {
+        "telegramApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If drop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "telegram down",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If drop": {
+      "main": [
+        [
+          {
+            "node": "If down",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "If down": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "telegram up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "active": true
+}

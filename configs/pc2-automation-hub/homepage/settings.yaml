@@ -1,0 +1,29 @@
+title: SecureNet
+language: es
+theme: dark
+color: slate
+
+headerStyle: clean
+hideVersion: true
+useEqualHeights: true
+
+background:
+  blur: none
+  opacity: 0
+
+layout:
+  SecureNet:
+    style: row
+    columns: 2
+  Widgets:
+    style: row
+    columns: 4
+  Developer:
+    style: row
+    columns: 3
+  Social:
+    style: row
+    columns: 3
+  Entertainment:
+    style: row
+    columns: 3

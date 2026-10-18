@@ -1,29 +1,13 @@
-# Security Policy
+# Security
 
-This repository is a sanitised public version of a cybersecurity lab.
+## Status
 
-## Sensitive Data Policy
+This repository is the **archived v1** of SecureNet, a lab project. It is not maintained and must not be deployed as-is on a network you care about: its known weaknesses are documented in [docs/08-security-review.md](docs/08-security-review.md).
 
-Do not commit:
+## Secrets
 
-- Passwords or password lists.
-- Private keys.
-- WireGuard client/server keys.
-- Telegram bot tokens.
-- AWS access keys, secret keys or session tokens.
-- `.env` files with real values.
-- Exported virtual machines containing credentials.
-- Screenshots that expose private IPs, tokens, users or dashboards with secrets.
+No real credentials are stored here. Passwords, keys, tokens, chat IDs and bucket names were removed or replaced with placeholders such as `<...>` and `${...}`. If you rebuild the lab, generate your own values and keep them out of Git (`.env` is ignored).
 
-Use placeholders such as:
+## Reporting
 
-```text
-CHANGE_ME
-REDACTED
-YOUR_TOKEN_HERE
-YOUR_BUCKET_NAME
-```
-
-## Responsible Use
-
-Attack simulations documented in this project must only be executed in controlled lab environments owned by the author or explicitly authorised for testing.
+If you spot something sensitive that should not be public, please open an issue or contact me through [GitHub](https://github.com/JRevii).

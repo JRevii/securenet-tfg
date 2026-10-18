@@ -1,0 +1,11 @@
+# Pi-hole v6 (/etc/pihole/pihole.toml) - only the settings changed from defaults
+[dns]
+  upstreams = ["8.8.8.8", "8.8.4.4"]
+  interface = "enp0s3"          # internal lab network
+  listeningMode = "LOCAL"       # answer only devices on directly attached networks
+
+# Blocklists (gravity):
+#   https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts   (added twice by mistake)
+#   https://v.firebog.net/hosts/AdguardDNS.txt
+#   https://raw.githubusercontent.com/PolishFiltersTeam/KADhosts/master/KADhosts.txt
+# ~68,449 blocked domains

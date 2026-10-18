@@ -1,0 +1,35 @@
+/* SecureNet Clean Modern */
+
+body {
+  background: linear-gradient(135deg, #0f172a, #111827);
+}
+
+/* Tarjetas */
+.card,
+.service-card,
+.widget-card {
+  border-radius: 18px !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  background: rgba(15,23,42,0.7) !important;
+  backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
+}
+
+.card:hover,
+.service-card:hover,
+.widget-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+  border-color: rgba(59,130,246,0.4) !important;
+}
+
+/* Secciones */
+h1, h2, h3 {
+  letter-spacing: 0.5px;
+}
+
+/* Recursos más compactos */
+.resource {
+  border-radius: 12px !important;
+}
+}

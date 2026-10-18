@@ -1,0 +1,115 @@
+{
+  "name": "SecureNet/ Workflow 3 (Backups Automáticos)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d6de8693-c9c5-4ebb-b4c1-6bb2061d6b99",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "command": "/opt/securenet/backup.sh"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "ca7c9ae3-43d6-4a2b-9139-f3f3befd98f5",
+      "name": "Execute a command",
+      "credentials": {
+        "sshPassword": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = ($json.stdout || $json.data || '').toString();\n\nconst exitMatch = out.match(/EXIT_CODE:(\\d+)/);\nconst exitCode = exitMatch ? parseInt(exitMatch[1], 10) : 1;\n\n// intenta extraer el nombre del archivo .enc subido (del mensaje del script)\nconst fileMatch = out.match(/Backup OK:\\s*([^\\s]+)\\s+uploaded/i);\nconst backupFile = fileMatch ? fileMatch[1] : null;\n\nreturn [{\n  exitCode,\n  backupFile,\n  raw_output: out.slice(-3500) // recorta para telegram\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "b74d83fc-4605-46d4-ac87-831b41f894fc",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "chatId": "<TELEGRAM_CHAT_ID>",
+        "text": "=✅ SecureNet – Backup diario OK  📦 Archivo: {{$json.backupFile || \"OK (archivo no detectado)\"}} 🕒 Fecha: {{$now.toLocaleString()}}  📍 S3: <YOUR_S3_BUCKET>/daily/",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "3d12be0c-4a70-49ad-b164-c1e4cef0b718",
+      "name": "Send a text message",
+      "credentials": {
+        "telegramApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Execute a command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a command": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "active": true
+}

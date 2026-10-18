@@ -1,0 +1,86 @@
+{
+  "name": "Alertas de Seguridad (Fail2Ban)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fail2ban",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9614cf49-e352-40e1-89f4-b07104fab284",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "chatId": "<TELEGRAM_CHAT_ID>",
+        "text": "=🚨 SecureNet | ALERTA Fail2Ban\n\n📍 Gateway: {{$json.hostname}}\n🔒 Jail: {{$json.jail}}\n⛔ IP: {{$json.ip}}\n🕒 Hora: {{$json.time}}\n📌 Evento: {{$json.event}}\n\n🛡️ Acción aplicada automáticamente por SecureNet.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        0
+      ],
+      "id": "02dea01d-d739-42c1-bf62-4ef73a63b811",
+      "name": "Send a text message",
+      "alwaysOutputData": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"hostname\": \"={{ $json.body?.hostname ?? $json.hostname ?? 'PC1' }}\",\n  \"jail\": \"={{ $json.body?.jail ?? $json.jail ?? 'sshd' }}\",\n  \"ip\": \"={{ $json.body?.ip ?? $json.ip ?? 'N/A' }}\",\n  \"time\": \"={{ $json.body?.ts ?? $json.ts ?? $json.body?.time ?? $json.time ?? $now }}\",\n  \"event\": \"={{ $json.body?.event ?? $json.event ?? 'BAN' }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        160,
+        0
+      ],
+      "id": "e983253f-e965-4338-832b-caee44e22871",
+      "name": "Edit Fields"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "active": true
+}
