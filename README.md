@@ -13,7 +13,7 @@ Final degree project (TFG) · Microcomputer Systems and Networks (SMR) · ALMI, 
 ![Pi-hole](https://img.shields.io/badge/Pi--hole-v6-96060C?logo=pihole&logoColor=white)
 ![AWS S3](https://img.shields.io/badge/AWS-S3-FF9900?logo=amazons3&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-alerts-26A5E4?logo=telegram&logoColor=white)
-![Status](https://img.shields.io/badge/status-v1_archived-lightgrey)
+![Status](https://img.shields.io/badge/status-v1.1_patched-blue)
 
 [Español](README.es.md) · **English**
 
@@ -119,7 +119,7 @@ Ubuntu Server 24.04 · VirtualBox · Docker 29 / Compose v5 · n8n 2.4 · Uptime
 
 - **Secrets:** all passwords, keys, tokens and IDs were removed or replaced with placeholders (`<...>`, `${...}`). The real ones were never committed.
 - **VM images** (`.ova`, ~10 GB) are not included; the configuration in this repo is enough to rebuild the lab.
-- **Status:** v1 is frozen. Improvements happen in SecureNet v2.
+- **Status:** v1.1 — fixes from the post-delivery review (see [CHANGELOG.md](CHANGELOG.md)). The graded version is tagged [`v1.0-tfg`](../../tree/v1.0-tfg). Everything else continues in SecureNet v2.
 
 ## Author
 

@@ -10,7 +10,7 @@ PC2 (`almi2server`, `192.168.2.20`) runs every application service in Docker, de
 |---|---|---|---|
 | `n8n` | `n8nio/n8n` (2.4.4) | 5678 | Automation engine: webhooks, schedules, Code nodes, SSH, Telegram |
 | `uptime-kuma` | `louislam/uptime-kuma:1` | 3001 | Availability monitoring, sends webhooks to n8n |
-| `docker-socket-proxy` | `tecnativa/docker-socket-proxy` | 2375 (internal) | Limited Docker API for n8n (`CONTAINERS=1`, `POST=1`) |
+| `docker-socket-proxy` | `lscr.io/linuxserver/socket-proxy` | 2375 (internal) | Limited Docker API for n8n (`CONTAINERS=1`, `POST=0`, `ALLOW_RESTARTS=1`) |
 | `homepage` | `ghcr.io/gethomepage/homepage` | 3000 | Dashboard with links and system widgets |
 | `portainer` | `portainer/portainer-ce` | 9000 / 9443 | Docker management UI |
 | `nextcloud` | `nextcloud:29-apache` | 8080 | Example service protected by the lab (outage demos) |
@@ -32,7 +32,26 @@ wget -qO- --post-data='' http://docker-socket-proxy:2375/containers/homepage/res
 
 (n8n's image uses BusyBox `wget`, which does not support `--method=POST`; `--post-data=''` does the job.)
 
-> v1 limitation: `POST=1` allows *any* POST on the containers API, including creating containers. See [security review](08-security-review.md).
+**v1.1 (November 2026):** the original configuration (`POST=1`) allowed *any* POST on the containers API, including creating a privileged container (≈ root on PC2). The proxy now allows only listing and restarting:
+
+```yaml
+environment:
+  CONTAINERS: 1      # list/inspect (daily report)
+  POST: 0            # block every other write
+  ALLOW_RESTARTS: 1  # allow only stop/restart/kill
+```
+
+Verified from inside the n8n container:
+
+```
+POST /containers/create             → 403 Forbidden
+POST /containers/homepage/restart   → OK (homepage "Up Less than a second")
+GET  /containers/json               → 200, JSON
+```
+
+![Proxy test](../assets/screenshots/proxy-403-test.png)
+
+With `tecnativa/docker-socket-proxy`, the restart was also rejected (403) when `POST=0`, even after pulling the latest image, which broke self-healing. The image was replaced with `lscr.io/linuxserver/socket-proxy`, which accepts the same variables and documents `ALLOW_RESTARTS` working with `POST=0`. The container keeps its name, so n8n needed no changes. See [security review](08-security-review.md).
 
 ### Persistent and recoverable n8n
 

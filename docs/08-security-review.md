@@ -56,6 +56,21 @@ The review is not only bad news. Several decisions held up well:
 - **Input normalisation and de-duplication** in the self-healing workflow, which also flags unmapped events instead of dropping them.
 - Fail2Ban keeps its native ban and adds alerting on top.
 
+## Fixed in v1.1 (November 2026)
+
+After publishing the project, a reviewer asked two questions: *"If n8n goes down, who sends the alert?"* and *"How does n8n reach the Docker API?"*. Both pointed at real gaps. These fixes were applied to the running lab and verified; the analysis above is kept as it was.
+
+| # | Fix | Evidence |
+|---|---|---|
+| B15 (new) | n8n was a single point of failure: every alert went through it. Uptime Kuma now notifies Telegram **directly**, with its own bot | `docker stop n8n` → Kuma alert in under a minute ([screenshot](../assets/screenshots/telegram-kuma-direct-alerts.png)) |
+| B6 | Removed the webhook on the n8n monitor (it sent `HOMEPAGE` and `"..."`); the monitor checks `/healthz` | Stopping/starting n8n produces only Kuma's Down/Up messages |
+| B11 | 2 retries on every monitor | No false outage while n8n starts |
+| S2 | Socket proxy limited to list + restart (`POST=0`, `ALLOW_RESTARTS=1`), image switched to `linuxserver/socket-proxy` | create → 403, restart → OK, list → OK ([screenshot](../assets/screenshots/proxy-403-test.png)); self-healing still works ([screenshot](../assets/screenshots/telegram-n8n-recovered-via-proxy.png)) |
+| New | Error workflow ([07-error-handler.json](../workflows/07-error-handler.json)): any failed workflow sends a Telegram alert | A scheduled test workflow that throws → alert with workflow, node and error |
+| — | Telegram tokens rotated; one bot for Kuma, another for n8n | — |
+
+Still open, and planned for v2: S1 (webhook authentication) is next; everything still runs on one host, so if PC2 itself goes down nobody is alerted (v2: external watchdog in AWS).
+
 ## v2 roadmap
 
 These findings are the backlog for **SecureNet v2**, which will be developed in its own repository:
