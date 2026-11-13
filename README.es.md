@@ -13,7 +13,7 @@ Trabajo de Fin de Grado (TFG) · Sistemas Microinformáticos y Redes (SMR) · AL
 ![Pi-hole](https://img.shields.io/badge/Pi--hole-v6-96060C?logo=pihole&logoColor=white)
 ![AWS S3](https://img.shields.io/badge/AWS-S3-FF9900?logo=amazons3&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-alertas-26A5E4?logo=telegram&logoColor=white)
-![Estado](https://img.shields.io/badge/estado-v1_archivada-lightgrey)
+![Estado](https://img.shields.io/badge/estado-v1.1_parcheada-blue)
 
 **Español** · [English](README.md)
 
@@ -121,7 +121,7 @@ Ubuntu Server 24.04 · VirtualBox · Docker 29 / Compose v5 · n8n 2.4 · Uptime
 
 - **Secretos:** todas las contraseñas, claves, tokens e identificadores se han eliminado o sustituido por marcadores (`<...>`, `${...}`). Los reales nunca se han subido.
 - **Imágenes de las VMs** (`.ova`, ~10 GB): no se incluyen; la configuración de este repositorio basta para reconstruir el laboratorio.
-- **Estado:** la v1 está congelada. Las mejoras se hacen en SecureNet v2.
+- **Estado:** v1.1, con correcciones de la revisión posterior a la entrega (ver [CHANGELOG.md](CHANGELOG.md)). La versión evaluada está etiquetada como [`v1.0-tfg`](../../tree/v1.0-tfg). El resto continúa en SecureNet v2.
 
 ## Autor
 

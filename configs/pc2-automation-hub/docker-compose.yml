@@ -42,7 +42,7 @@ services:
       - securenet
 
   docker-socket-proxy:
-    image: tecnativa/docker-socket-proxy:latest
+    image: lscr.io/linuxserver/socket-proxy:latest
     container_name: docker-socket-proxy
     restart: unless-stopped
     networks:
@@ -50,9 +50,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      CONTAINERS: 1
-      POST: 1
-      # INFO: 1  # opcional
+      CONTAINERS: 1      # list/inspect containers (daily report)
+      POST: 0            # v1.1 (S2): block every other write: create, delete, exec...
+      ALLOW_RESTARTS: 1  # v1.1 (S2): allow only stop/restart/kill
 
   uptime-kuma:
     image: louislam/uptime-kuma:1

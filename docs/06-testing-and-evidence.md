@@ -90,3 +90,17 @@ https://192.168.2.20:9443             200   Portainer
 http://docker-socket-proxy:2375/_ping 200   from inside n8n
 https://api.telegram.org              302   Internet via NAT
 ```
+
+## v1.1 fixes (November 2026)
+
+Uptime Kuma alerts directly through its own bot, so an n8n outage is still reported:
+
+![Kuma direct alerts](../assets/screenshots/telegram-kuma-direct-alerts.png)
+
+The socket proxy only allows list and restart:
+
+![Proxy test](../assets/screenshots/proxy-403-test.png)
+
+Self-healing still works through the restricted proxy (`docker stop homepage` → restarted by n8n):
+
+![Recovered via proxy](../assets/screenshots/telegram-n8n-recovered-via-proxy.png)
