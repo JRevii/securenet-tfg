@@ -13,7 +13,7 @@ Fixes from the [post-delivery security review](docs/08-security-review.md), prom
 
 ### Added
 
-- **Error workflow** ([`workflows/07-error-handler.json`](workflows/07-error-handler.json)): if any workflow fails, n8n sends a Telegram alert with the workflow, node and error. Tested with a scheduled workflow that throws on purpose.
+- **Error workflow** ([`workflows/07-error-handler.json`](workflows/07-error-handler.json)): if any workflow fails, n8n sends a Telegram alert with the workflow, node and error. Tested with a scheduled workflow that throws on purpose. In its first hour it caught a real failure: after rotating the Telegram tokens, *Pi-hole Stats* still pointed to a deleted credential and would have failed silently. Fixed by reassigning the credential.
 
 ### Changed
 

@@ -66,7 +66,7 @@ After publishing the project, a reviewer asked two questions: *"If n8n goes down
 | B6 | Removed the webhook on the n8n monitor (it sent `HOMEPAGE` and `"..."`); the monitor checks `/healthz` | Stopping/starting n8n produces only Kuma's Down/Up messages |
 | B11 | 2 retries on every monitor | No false outage while n8n starts |
 | S2 | Socket proxy limited to list + restart (`POST=0`, `ALLOW_RESTARTS=1`), image switched to `linuxserver/socket-proxy` | create → 403, restart → OK, list → OK ([screenshot](../assets/screenshots/proxy-403-test.png)); self-healing still works ([screenshot](../assets/screenshots/telegram-n8n-recovered-via-proxy.png)) |
-| New | Error workflow ([07-error-handler.json](../workflows/07-error-handler.json)): any failed workflow sends a Telegram alert | A scheduled test workflow that throws → alert with workflow, node and error |
+| New | Error workflow ([07-error-handler.json](../workflows/07-error-handler.json)): any failed workflow sends a Telegram alert | A scheduled test workflow that throws → alert with workflow, node and error. First real catch: *Pi-hole Stats* pointing to a deleted Telegram credential after the token rotation |
 | — | Telegram tokens rotated; one bot for Kuma, another for n8n | — |
 
 Still open, and planned for v2: S1 (webhook authentication) is next; everything still runs on one host, so if PC2 itself goes down nobody is alerted (v2: external watchdog in AWS).
