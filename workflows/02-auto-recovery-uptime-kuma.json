@@ -1,5 +1,5 @@
 {
-  "name": "prueba salud",
+  "name": "SecureNet - WF2 Auto-recovery (Uptime Kuma)",
   "nodes": [
     {
       "parameters": {
@@ -8,51 +8,57 @@
         "options": {
           "responseCode": {
             "values": {}
-          }
-        }
+          },
+          "ipWhitelist": "172.18.0.1"
+        },
+        "authentication": "headerAuth"
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -288,
-        0
+        0,
+        200
       ],
       "id": "e26cd1e2-9e9c-4fc5-a017-ef08221011c8",
-      "name": "Webhook"
+      "name": "Webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "SecureNet webhook - kuma-alert"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "// SecureNet - FINAL STABLE (Run Once for All Items)\n// - Normaliza payload Kuma\n// - Detecta DOWN/UP\n// - Mapea monitor_code -> container\n// - Anti-duplicados por monitor+estado con TTL separado\n// - NO dropea errores de mapeo (los marca como ERROR para notificar)\n\nfunction nowIso() { return new Date().toISOString(); }\n\nconst staticData = $getWorkflowStaticData('node');\nif (!staticData.seen) staticData.seen = {};\n\nconst nowSec = Math.floor(Date.now() / 1000);\n\n// TTLs separados (recomendado)\nconst TTL_DOWN = 120; // evita spam de DOWN (más agresivo)\nconst TTL_UP   = 45;  // UP suele repetirse más, TTL menor\nconst CLEANUP_TTL = Math.max(TTL_DOWN, TTL_UP) * 6;\n\n// cleanup cache\nfor (const [sig, t] of Object.entries(staticData.seen)) {\n  if (nowSec - t > CLEANUP_TTL) delete staticData.seen[sig];\n}\n\nconst MAP = {\n  HOMEPAGE: \"homepage\",\n  N8N: \"n8n\",\n  PORTAINER: \"portainer\",\n  KUMA: \"uptime-kuma\",\n  // añade aquí más monitores si los creas:\n  // WORDPRESS: \"wordpress\",\n};\n\nconst out = [];\n\nfor (const item of $input.all()) {\n  const incoming = item.json?.body ?? item.json ?? {};\n\n  let msg = incoming.msg;\n  let monitorCode = incoming.monitor_code;\n  let statusField = incoming.status;\n\n  // Caso raro: form-urlencoded (una sola clave que es JSON)\n  if ((!msg || !monitorCode) && incoming && typeof incoming === \"object\") {\n    const keys = Object.keys(incoming);\n    if (keys.length === 1 && keys[0].trim().startsWith(\"{\")) {\n      try {\n        const parsed = JSON.parse(keys[0]);\n        msg = msg ?? parsed.msg;\n        monitorCode = monitorCode ?? parsed.monitor_code;\n        statusField = statusField ?? parsed.status;\n      } catch (e) {}\n    }\n  }\n\n  msg = (msg ?? \"\").toString().trim();\n  monitorCode = (monitorCode ?? \"\").toString().trim();\n  statusField = (statusField ?? \"\").toString().trim();\n\n  const ts = nowIso();\n\n  // Validación mínima (no “pierdas” eventos silenciosamente)\n  if (!msg || !monitorCode) {\n    out.push({\n      json: {\n        drop: false,\n        status: \"ERROR\",\n        reason: \"Missing msg/monitor_code\",\n        ts,\n        incoming\n      }\n    });\n    continue;\n  }\n\n  const msgLower = msg.toLowerCase();\n  const statusLower = statusField.toLowerCase();\n\n  // Detectores robustos (prioriza statusField si viene)\n  const isDown =\n    statusLower === \"down\" ||\n    msgLower.includes(\"[🔴 down]\") ||\n    /\\[\\s*🔴\\s*down\\s*\\]/i.test(msg);\n\n  const isUp =\n    statusLower === \"up\" ||\n    msgLower.includes(\"[✅ up]\") ||\n    msgLower.includes(\"[🟢 up]\") ||\n    /\\[\\s*(✅|🟢)\\s*up\\s*\\]/i.test(msg);\n\n  let status = \"INFO\";\n  if (isDown) status = \"DOWN\";\n  else if (isUp) status = \"UP\";\n\n  // Extraer nombre del monitor del msg (primer [ ... ])\n  let monitorName = \"\";\n  const m = msg.match(/^\\s*\\[([^\\]]+)\\]/);\n  if (m?.[1]) monitorName = m[1].trim();\n  if (!monitorName) monitorName = monitorCode;\n\n  const codeNormalized = monitorCode.toUpperCase();\n\n  const container = MAP[codeNormalized] || \"\";\n\n  // Si es DOWN y no hay mapping, NO dropear: marca ERROR para notificar\n  if (status === \"DOWN\" && !container) {\n    out.push({\n      json: {\n        drop: false,\n        status: \"ERROR\",\n        reason: `No container mapping for monitor_code=${codeNormalized}`,\n        ts,\n        msg,\n        monitorName,\n        monitorCode: codeNormalized,\n        container: \"\",\n        isDown,\n        isUp\n      }\n    });\n    continue;\n  }\n\n  // Dedupe estable: SOLO monitor+status\n  // Así no depende de msg (que puede cambiar o repetirse)\n  const signature = `${codeNormalized}|${status}`;\n\n  let isDup = false;\n  if (status === \"DOWN\" || status === \"UP\") {\n    const ttl = status === \"DOWN\" ? TTL_DOWN : TTL_UP;\n    const last = staticData.seen[signature];\n    isDup = !!(last && (nowSec - last) < ttl);\n\n    // Guarda siempre el último para bloquear spam\n    staticData.seen[signature] = nowSec;\n  }\n\n  out.push({\n    json: {\n      drop: isDup,\n      reason: isDup ? `Duplicate ${signature} within TTL` : \"ok\",\n      ts,\n      status,\n      msg,\n      monitorName,\n      monitorCode: codeNormalized,\n      container,\n      isDown,\n      isUp,\n      signature\n    }\n  });\n}\n\nreturn out;\n"
+        "jsCode": "// SecureNet v1.1 - classify an Uptime Kuma webhook event (B5, B7)\n// Kuma sends: {msg, monitor_code, monitor_name, status}; status is Kuma's heartbeat\n// status (0 = DOWN, 1 = UP, -1 = no heartbeat, e.g. the \"Test\" button).\n\n// Containers n8n may restart through the socket proxy (S2: list + restart only).\n// n8n and uptime-kuma are deliberately absent: n8n must never restart itself (B6),\n// and Kuma already alerts on its own through its direct Telegram notification (B15).\nconst RESTARTABLE = { HOMEPAGE: 'homepage', PORTAINER: 'portainer', NEXTCLOUD: 'nextcloud' };\n// Monitored but not restartable from PC2 (Pi-hole is bare metal on PC1): alert only.\nconst ALERT_ONLY = { PIHOLE: 'Pi-hole runs on PC1 (bare metal), not in Docker on PC2' };\n\n// De-duplication key for the next node (Remove Duplicates keeps its history in n8n's DB).\n// Same monitor + same state inside the same time window = duplicate.\n// (Workflow static data is not persisted from Code nodes running in n8n 2.x task runners,\n//  which is why the v1 de-duplication never dropped anything.)\nconst WINDOW = { DOWN: 120, UP: 60 };\nconst nowSec = Math.floor(Date.now() / 1000);\n\nconst out = [];\nfor (const item of $input.all()) {\n  const b = item.json.body ?? {};\n  const msg = String(b.msg ?? '').trim();\n  const monitorCode = String(b.monitor_code ?? '').trim().toUpperCase();\n  const hb = Number(b.status);\n  const ts = new Date().toISOString();\n\n  let status = 'UNKNOWN';\n  if (hb === 0 || /\\[\\s*🔴\\s*down\\s*\\]/i.test(msg)) status = 'DOWN';\n  else if (hb === 1 || /\\[\\s*(✅|🟢)\\s*up\\s*\\]/i.test(msg)) status = 'UP';\n\n  const nameFromMsg = (msg.match(/^\\s*\\[([^\\]]+)\\]/) || [])[1];\n  const monitorName = String(b.monitor_name || nameFromMsg || monitorCode || 'unknown').trim();\n  const container = RESTARTABLE[monitorCode] ?? null;\n\n  let action, reason;\n  if (!monitorCode || !msg) { action = 'INVALID'; reason = 'Missing msg or monitor_code'; }\n  else if (status === 'UNKNOWN') { action = 'INFO'; reason = 'Message without a DOWN/UP state (e.g. Kuma test)'; }\n  else if (status === 'UP') { action = 'RECOVERED'; reason = 'ok'; }\n  else if (container) { action = 'RESTART'; reason = 'ok'; }\n  else { action = 'ALERT'; reason = ALERT_ONLY[monitorCode] ?? `No container mapped for monitor_code=${monitorCode}`; }\n\n  const dedupeKey = (status === 'DOWN' || status === 'UP')\n    ? `${monitorCode}|${status}|${Math.floor(nowSec / WINDOW[status])}`\n    : `${action}|${ts}|${Math.random()}`;          // INFO / INVALID are never de-duplicated\n\n  out.push({ json: { action, status, reason, monitorCode, monitorName, container, msg, ts, dedupeKey } });\n}\nreturn out;"
       },
+      "name": "Classify",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        16,
-        0
+        220,
+        200
       ],
-      "id": "29e8e65b-eb1c-4b02-91ea-e7b144eeac27",
-      "name": "Code in JavaScript"
+      "id": "bc8e1100-3d93-408e-ad9f-d12ac5dbf5d4"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "=http://docker-socket-proxy:2375/containers/{{$json.container}}/restart?t=5\n",
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.dedupeKey }}",
         "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
+          "scope": "node",
+          "historySize": 1000
         }
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
+      "name": "Drop duplicates",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
       "position": [
-        816,
-        112
+        330,
+        200
       ],
-      "id": "31fa3bca-c888-4cab-a03b-43a29032479f",
-      "name": "HTTP Request"
+      "id": "5b00f93c-9d0a-4792-ad73-c117919b7c62"
     },
     {
       "parameters": {
@@ -60,48 +66,14 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose",
+            "typeValidation": "strict",
             "version": 3
           },
           "conditions": [
             {
-              "id": "0cde3b90-b3ff-4ecf-b6f4-39aafeeda878",
-              "leftValue": "={{$json.drop}} ",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "looseTypeValidation": true,
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        240,
-        0
-      ],
-      "id": "7979fef1-deea-40ed-b830-de5b56f9c74d",
-      "name": "If drop"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "459c17f9-bcd6-4929-8e05-2389dd5e122a",
-              "leftValue": "={{$json.status}}",
-              "rightValue": "DOWN",
+              "id": "615b867e-ebb5-4b89-86d3-b262ccbbfe43",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "RESTART",
               "operator": {
                 "type": "string",
                 "operation": "equals"
@@ -110,32 +82,72 @@
           ],
           "combinator": "and"
         },
-        "looseTypeValidation": true,
         "options": {}
       },
+      "name": "Needs restart?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        528,
-        128
+        440,
+        120
       ],
-      "id": "7d3d101f-9c7e-4f02-bcc8-d00594648ceb",
-      "name": "If down"
+      "id": "2a6efbed-62aa-4d21-8bdd-ac5c95fe05d0"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://docker-socket-proxy:2375/containers/{{ $json.container }}/restart?t=5",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "name": "Restart container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        660,
+        40
+      ],
+      "id": "a26f2768-af27-4889-b874-81dc5b9684fb",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// One message per event; restart outcome comes from the HTTP node (B5, new B16)\nconst ev = $('Drop duplicates').item.json;\nlet restart = null;\nif (ev.action === 'RESTART') {\n  if ($json.error) {\n    const e = $json.error;\n    restart = `❌ Reinicio FALLIDO vía socket proxy: ${typeof e === 'string' ? e : (e.message ?? JSON.stringify(e))}`;\n  } else {\n    restart = `🔁 Contenedor \"${ev.container}\" reiniciado vía socket proxy (HTTP ${$json.statusCode ?? '2xx'})`;\n  }\n}\nconst L = [];\nif (ev.action === 'RESTART' || ev.action === 'ALERT') {\n  L.push('🚨 SecureNet | SERVICIO CAÍDO', '',\n         `🛰️ Servicio: ${ev.monitorName}`, `🆔 Monitor: ${ev.monitorCode}`);\n  if (ev.container) L.push(`📦 Contenedor: ${ev.container}`);\n  L.push(`🕒 ${ev.ts}`, '', `📩 Uptime Kuma: ${ev.msg}`, '',\n         restart ?? `⚠️ Sin reinicio automático: ${ev.reason}`);\n} else if (ev.action === 'RECOVERED') {\n  L.push('✅ SecureNet | SERVICIO RECUPERADO', '',\n         `🛰️ Servicio: ${ev.monitorName}`, `🆔 Monitor: ${ev.monitorCode}`,\n         `🕒 ${ev.ts}`, '', `📩 Uptime Kuma: ${ev.msg}`);\n} else if (ev.action === 'INFO') {\n  L.push('ℹ️ SecureNet | Aviso de Uptime Kuma sin estado', '',\n         `🆔 Monitor: ${ev.monitorCode}`, `📩 ${ev.msg}`);\n} else {\n  L.push('❓ SecureNet | Evento no reconocido en kuma-alert', '', `Motivo: ${ev.reason}`);\n}\nreturn { json: { ...ev, restart, text: L.join('\\n') } };",
+        "mode": "runOnceForEachItem"
+      },
+      "name": "Compose message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        200
+      ],
+      "id": "1bd1e97e-c9f1-459c-b307-7226f7d22a1c"
     },
     {
       "parameters": {
         "chatId": "<TELEGRAM_CHAT_ID>",
-        "text": "=🚨 SecureNet | INCIDENTE DETECTADO\n\n🛰️ Servicio: {{$json.monitorName}}\n📦 Contenedor: {{$json.container}}\n🆔 Código monitor: {{$json.monitorCode}}\n\n🕒 Hora del evento:\n{{$json.ts}}\n\n━━━━━━━━━━━━━━━━━━━━\n\n📩 Mensaje de Uptime Kuma:\n{{$json.msg}}\n\n━━━━━━━━━━━━━━━━━━━━\n\n🛠️ Acción automática ejecutada:\n🔁 Restart del contenedor vía Docker API\n\n📌 Sistema anti-duplicados:\n{{$json.reason}}\n\n🔐 Estado: Gestión automática completada\n",
-        "additionalFields": {}
+        "text": "={{ String($json.text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
       },
+      "name": "Send Telegram",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1056,
-        112
+        1100,
+        200
       ],
-      "id": "c35bc5ad-102e-4229-98c9-89759d429650",
-      "name": "telegram down",
+      "id": "6a4ded28-688b-4d01-8258-ec224111589d",
       "credentials": {
         "telegramApi": {
           "id": "<CREDENTIAL_ID>",
@@ -145,24 +157,52 @@
     },
     {
       "parameters": {
-        "chatId": "<TELEGRAM_CHAT_ID>",
-        "text": "=✅ SecureNet | SERVICIO RECUPERADO\n\n🛰️ Servicio: {{$json.monitorName}}\n🆔 Código monitor: {{$json.monitorCode}}\n\n🕒 Hora del evento:\n{{$json.ts}}\n\n━━━━━━━━━━━━━━━━━━━━\n\n📩 Confirmación de Uptime Kuma:\n{{$json.msg}}\n\n━━━━━━━━━━━━━━━━━━━━\n\n🟢 Estado actual: OPERATIVO\n📌 Sistema anti-duplicados:\n{{$json.reason}}\n",
-        "additionalFields": {}
+        "jsCode": "// Shared event log for the daily report (B3): one JSON line per DOWN\nreturn $input.all()\n  .filter(i => i.json.status === 'DOWN')\n  .map(i => ({ json: { line: JSON.stringify({ ts: i.json.ts, type: 'kuma_down',\n                                               service: i.json.monitorName, code: i.json.monitorCode }) + '\\n' } }));"
       },
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
+      "name": "Event line",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        784,
-        288
+        440,
+        380
       ],
-      "id": "9378b59f-290d-48a1-a1f0-626ce1015be6",
-      "name": "telegram up",
-      "credentials": {
-        "telegramApi": {
-          "id": "<CREDENTIAL_ID>",
-          "name": "Telegram account"
+      "id": "13a2db99-68ef-4c45-9460-85bdac0137d3"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "line",
+        "options": {
+          "fileName": "events.jsonl",
+          "encoding": "utf8"
         }
-      }
+      },
+      "name": "Event to file",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        380
+      ],
+      "id": "dc7b1f67-3181-406a-80d7-7ad15b22d00f"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/home/node/.n8n-files/events.jsonl",
+        "dataPropertyName": "data",
+        "options": {
+          "append": true
+        }
+      },
+      "name": "Append to events log",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        880,
+        380
+      ],
+      "id": "72ce470c-d574-4558-b999-8bb3a464573f"
     }
   ],
   "connections": {
@@ -170,59 +210,103 @@
       "main": [
         [
           {
-            "node": "Code in JavaScript",
+            "node": "Classify",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code in JavaScript": {
+    "Classify": {
       "main": [
         [
           {
-            "node": "If drop",
+            "node": "Drop duplicates",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP Request": {
+    "Drop duplicates": {
       "main": [
         [
           {
-            "node": "telegram down",
+            "node": "Needs restart?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Event line",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "If drop": {
+    "Needs restart?": {
       "main": [
         [
           {
-            "node": "If down",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "If down": {
-      "main": [
-        [
-          {
-            "node": "HTTP Request",
+            "node": "Restart container",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "telegram up",
+            "node": "Compose message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restart container": {
+      "main": [
+        [
+          {
+            "node": "Compose message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Compose message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose message": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event line": {
+      "main": [
+        [
+          {
+            "node": "Event to file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event to file": {
+      "main": [
+        [
+          {
+            "node": "Append to events log",
             "type": "main",
             "index": 0
           }
@@ -230,9 +314,13 @@
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "<ERROR_WORKFLOW_ID>"
   },
-  "active": true
+  "tags": []
 }

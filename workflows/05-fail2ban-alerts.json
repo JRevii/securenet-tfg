@@ -1,36 +1,95 @@
 {
-  "name": "Alertas de Seguridad (Fail2Ban)",
+  "name": "SecureNet - WF5 Fail2Ban alerts",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "fail2ban",
-        "options": {}
+        "options": {
+          "ipWhitelist": "192.168.2.10"
+        },
+        "authentication": "headerAuth"
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
         0,
-        0
+        200
       ],
       "id": "9614cf49-e352-40e1-89f4-b07104fab284",
-      "name": "Webhook"
+      "name": "Webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "SecureNet webhook - fail2ban"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e8072f4b-2620-44e5-a53d-b661544cda05",
+              "name": "hostname",
+              "value": "={{ $json.body?.hostname ?? 'PC1' }}",
+              "type": "string"
+            },
+            {
+              "id": "67a416ab-1e4b-40f2-8f9e-a0c461434c17",
+              "name": "jail",
+              "value": "={{ $json.body?.jail ?? 'sshd' }}",
+              "type": "string"
+            },
+            {
+              "id": "11f5ecfc-3be2-4d65-8943-0d26761c6576",
+              "name": "ip",
+              "value": "={{ $json.body?.ip ?? 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "b7b9d5a0-df2a-41fc-86d4-998d930964c7",
+              "name": "time",
+              "value": "={{ $json.body?.ts ?? $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "3e4191c5-98a8-42a4-8f31-ebb24af28fdc",
+              "name": "event",
+              "value": "={{ $json.body?.event ?? 'BAN' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Normalize",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        200
+      ],
+      "id": "c84b04c7-520e-4d9d-b9a2-6a666135516f"
     },
     {
       "parameters": {
         "chatId": "<TELEGRAM_CHAT_ID>",
-        "text": "=🚨 SecureNet | ALERTA Fail2Ban\n\n📍 Gateway: {{$json.hostname}}\n🔒 Jail: {{$json.jail}}\n⛔ IP: {{$json.ip}}\n🕒 Hora: {{$json.time}}\n📌 Evento: {{$json.event}}\n\n🛡️ Acción aplicada automáticamente por SecureNet.",
-        "additionalFields": {}
+        "text": "={{ String([\n  '🚨 SecureNet | ALERTA Fail2Ban',\n  '',\n  '📍 Gateway: ' + $json.hostname,\n  '🔒 Jail: ' + $json.jail,\n  '⛔ IP: ' + $json.ip,\n  '🕒 Hora: ' + $json.time,\n  '📌 Evento: ' + $json.event,\n  '',\n  '🛡️ Acción aplicada automáticamente por SecureNet.'\n].join('\\n')).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
       },
+      "name": "Send Telegram",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        320,
-        0
+        440,
+        120
       ],
-      "id": "02dea01d-d739-42c1-bf62-4ef73a63b811",
-      "name": "Send a text message",
-      "alwaysOutputData": false,
+      "id": "285f066c-db92-4a8a-8e87-83ebefd1e0bb",
       "credentials": {
         "telegramApi": {
           "id": "<CREDENTIAL_ID>",
@@ -40,18 +99,52 @@
     },
     {
       "parameters": {
-        "mode": "raw",
-        "jsonOutput": "={\n  \"hostname\": \"={{ $json.body?.hostname ?? $json.hostname ?? 'PC1' }}\",\n  \"jail\": \"={{ $json.body?.jail ?? $json.jail ?? 'sshd' }}\",\n  \"ip\": \"={{ $json.body?.ip ?? $json.ip ?? 'N/A' }}\",\n  \"time\": \"={{ $json.body?.ts ?? $json.ts ?? $json.body?.time ?? $json.time ?? $now }}\",\n  \"event\": \"={{ $json.body?.event ?? $json.event ?? 'BAN' }}\"\n}",
-        "options": {}
+        "jsCode": "// Shared event log for the daily report (B3)\nreturn $input.all().map(i => ({ json: { line: JSON.stringify({\n  ts: new Date().toISOString(), type: 'fail2ban_ban', ip: i.json.ip, jail: i.json.jail }) + '\\n' } }));"
       },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "name": "Event line",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        160,
-        0
+        440,
+        300
       ],
-      "id": "e983253f-e965-4338-832b-caee44e22871",
-      "name": "Edit Fields"
+      "id": "7fb82e62-1adc-4f8f-a0aa-3d1d1c4e4b23"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "line",
+        "options": {
+          "fileName": "events.jsonl",
+          "encoding": "utf8"
+        }
+      },
+      "name": "Event to file",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        300
+      ],
+      "id": "972cbb5b-764d-46f4-86ad-ef5caf972d00"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/home/node/.n8n-files/events.jsonl",
+        "dataPropertyName": "data",
+        "options": {
+          "append": true
+        }
+      },
+      "name": "Append to events log",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        880,
+        300
+      ],
+      "id": "7950fc90-2e25-4207-a624-948fed128d74"
     }
   ],
   "connections": {
@@ -59,18 +152,45 @@
       "main": [
         [
           {
-            "node": "Edit Fields",
+            "node": "Normalize",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Edit Fields": {
+    "Normalize": {
       "main": [
         [
           {
-            "node": "Send a text message",
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Event line",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event line": {
+      "main": [
+        [
+          {
+            "node": "Event to file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event to file": {
+      "main": [
+        [
+          {
+            "node": "Append to events log",
             "type": "main",
             "index": 0
           }
@@ -78,9 +198,13 @@
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "<ERROR_WORKFLOW_ID>"
   },
-  "active": true
+  "tags": []
 }

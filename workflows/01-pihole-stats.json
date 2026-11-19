@@ -1,5 +1,5 @@
 {
-  "name": "Pi-hole Stats  + Telegram",
+  "name": "SecureNet - WF1 Pi-hole stats",
   "nodes": [
     {
       "parameters": {
@@ -15,10 +15,36 @@
       "typeVersion": 1.3,
       "position": [
         0,
-        0
+        200
       ],
       "id": "f5c4b24e-5b89-4db6-ae48-240325546f3d",
       "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.2.10/api/auth",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "name": "Login",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        220,
+        200
+      ],
+      "id": "51cb2f2e-f35d-43e1-90f6-2b745e521c5b",
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "<CREDENTIAL_ID>",
+          "name": "Pi-hole API (n8n app password)"
+        }
+      }
     },
     {
       "parameters": {
@@ -28,74 +54,75 @@
           "parameters": [
             {
               "name": "X-FTL-SID",
-              "value": "= {{$node[\"AUTH\"].json.session.sid}}"
-            },
-            {
-              "name": " X-FTL-CSRF",
-              "value": "={{$node[\"AUTH\"].json.session.csrf}}"
+              "value": "={{ $('Login').item.json.session.sid }}"
             }
           ]
         },
-        "options": {
-          "response": {
-            "response": {}
-          }
-        }
+        "options": {}
       },
+      "name": "Get summary",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        416,
-        0
+        440,
+        200
       ],
-      "id": "23ee0961-809f-4120-9074-b2b7e225b5fc",
-      "name": "HTTP Request1"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://192.168.2.10/api/auth",
-        "sendHeaders": true,
-        "specifyHeaders": "json",
-        "jsonHeaders": "{\n  \"Content-Type\": \"application/json\"\n}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{\n  \"password\": \"<PIHOLE_WEB_PASSWORD>\"\n}",
-        "options": {
-          "response": {
-            "response": {}
-          }
-        }
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        208,
-        0
-      ],
-      "id": "315bef99-95a8-45fa-aa3e-8bb211848918",
-      "name": "AUTH"
+      "id": "9020de20-400c-489b-ac76-a41f0550985b"
     },
     {
       "parameters": {
         "chatId": "<TELEGRAM_CHAT_ID>",
-        "text": "=={{\"🛡️ SecureNet - Pi-hole\\n\\n\" +\"📡 Consultas DNS totales: \" + $json.queries.total + \"\\n\" +\"⛔ Bloqueadas: \" + $json.queries.blocked + \" (\" + $json.queries.percent_blocked + \"%)\\n\" +\"👥 Clientes activos: \" + $json.clients.active + \"\\n\" +\"📦 Dominios en Gravity: \" + $json.gravity.domains_being_blocked}}",
-        "additionalFields": {}
+        "text": "={{ String([\n  '🛡️ SecureNet | Pi-hole',\n  '',\n  '📡 Consultas DNS totales: ' + $json.queries.total,\n  '⛔ Bloqueadas: ' + $json.queries.blocked + ' (' + Number($json.queries.percent_blocked).toFixed(1) + '%)',\n  '👥 Clientes activos: ' + $json.clients.active,\n  '📦 Dominios en Gravity: ' + $json.gravity.domains_being_blocked\n].join('\\n')).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
       },
+      "name": "Send Telegram",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        624,
-        0
+        660,
+        200
       ],
-      "id": "6c0fc110-b0a6-4a2b-84fe-05a5d8f70731",
-      "name": "Send a text message",
+      "id": "94290305-d50d-49f5-a444-9a49d6fef970",
       "credentials": {
         "telegramApi": {
           "id": "<CREDENTIAL_ID>",
           "name": "Telegram account"
         }
       }
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "http://192.168.2.10/api/auth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-FTL-SID",
+              "value": "={{ $('Login').item.json.session.sid }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "name": "Logout",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        880,
+        200
+      ],
+      "id": "4db5344c-a90f-45d8-857f-8a7550d4ed36",
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -103,29 +130,40 @@
       "main": [
         [
           {
-            "node": "AUTH",
+            "node": "Login",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "AUTH": {
+    "Login": {
       "main": [
         [
           {
-            "node": "HTTP Request1",
+            "node": "Get summary",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP Request1": {
+    "Get summary": {
       "main": [
         [
           {
-            "node": "Send a text message",
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram": {
+      "main": [
+        [
+          {
+            "node": "Logout",
             "type": "main",
             "index": 0
           }
@@ -133,9 +171,13 @@
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "<ERROR_WORKFLOW_ID>"
   },
-  "active": true
+  "tags": []
 }

@@ -15,9 +15,10 @@
     {
       "parameters": {
         "chatId": "<TELEGRAM_CHAT_ID>",
-        "text": "=❌ Falló un workflow\nWorkflow: {{ $json.workflow.name }}\nNodo: {{ $json.execution.lastNodeExecuted }}\nError: {{ $json.execution.error.message }}",
+        "text": "={{ String([\n  '❌ SecureNet | Falló un workflow',\n  'Workflow: ' + $json.workflow.name,\n  'Nodo: ' + ($json.execution.lastNodeExecuted ?? '—'),\n  'Error: ' + ($json.execution.error?.message ?? '—'),\n  'Ejecución: ' + ($json.execution.id ?? '—')\n].join(String.fromCharCode(10))).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
         "additionalFields": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "name": "Aviso Telegram",
@@ -52,7 +53,8 @@
   "active": false,
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
   },
   "tags": []
 }

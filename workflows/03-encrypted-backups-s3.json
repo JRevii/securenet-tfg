@@ -1,11 +1,14 @@
 {
-  "name": "SecureNet/ Workflow 3 (Backups Automáticos)",
+  "name": "SecureNet - WF3 Encrypted backups to S3",
   "nodes": [
     {
       "parameters": {
         "rule": {
           "interval": [
-            {}
+            {
+              "field": "cronExpression",
+              "expression": "0 30 20 * * *"
+            }
           ]
         }
       },
@@ -13,57 +16,77 @@
       "typeVersion": 1.3,
       "position": [
         0,
-        0
+        200
       ],
       "id": "d6de8693-c9c5-4ebb-b4c1-6bb2061d6b99",
       "name": "Schedule Trigger"
     },
     {
       "parameters": {
-        "command": "/opt/securenet/backup.sh"
+        "authentication": "privateKey",
+        "command": "backup"
       },
+      "name": "Run backup.sh",
       "type": "n8n-nodes-base.ssh",
       "typeVersion": 1,
       "position": [
-        208,
-        0
+        220,
+        200
       ],
-      "id": "ca7c9ae3-43d6-4a2b-9139-f3f3befd98f5",
-      "name": "Execute a command",
+      "id": "ed76565d-3b52-49ef-81a0-19ba37805758",
       "credentials": {
-        "sshPassword": {
+        "sshPrivateKey": {
           "id": "<CREDENTIAL_ID>",
-          "name": "SSH Password account"
+          "name": "SSH securenet-backup (key, forced command)"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "jsCode": "const out = ($json.stdout || $json.data || '').toString();\n\nconst exitMatch = out.match(/EXIT_CODE:(\\d+)/);\nconst exitCode = exitMatch ? parseInt(exitMatch[1], 10) : 1;\n\n// intenta extraer el nombre del archivo .enc subido (del mensaje del script)\nconst fileMatch = out.match(/Backup OK:\\s*([^\\s]+)\\s+uploaded/i);\nconst backupFile = fileMatch ? fileMatch[1] : null;\n\nreturn [{\n  exitCode,\n  backupFile,\n  raw_output: out.slice(-3500) // recorta para telegram\n}];"
+        "jsCode": "// B4: decide success from the script's real exit status, never assume OK\nconst r = $json;\nconst stdout = String(r.stdout ?? '');\nconst stderr = String(r.stderr ?? '');\nconst m = stdout.match(/EXIT_CODE:(\\d+)/);\nconst exitCode = m ? Number(m[1]) : (typeof r.code === 'number' ? r.code : -1);\nconst file = (stdout.match(/Backup OK:\\s*(\\S+)\\s+uploaded/) || [])[1] ?? null;\nconst ok = exitCode === 0 && file !== null;\nconst tail = (stdout + '\\n' + stderr).split('\\n')\n  .filter(l => l.trim() && !/Completed .* remaining/.test(l))\n  .slice(-8).join('\\n');\nreturn { json: { ok, exitCode, file, tail } };",
+        "mode": "runOnceForEachItem"
       },
+      "name": "Parse result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        416,
-        0
+        440,
+        120
       ],
-      "id": "b74d83fc-4605-46d4-ac87-831b41f894fc",
-      "name": "Code in JavaScript"
+      "id": "9b039796-1148-4b3f-a2f6-9ea00f61f677"
+    },
+    {
+      "parameters": {
+        "jsCode": "// B4: the SSH step itself failed (host down, auth, timeout)\nconst e = $json.error;\nreturn { json: { ok: false, exitCode: -1, file: null,\n  tail: 'SSH error: ' + (typeof e === 'string' ? e : (e?.message ?? JSON.stringify(e))) } };",
+        "mode": "runOnceForEachItem"
+      },
+      "name": "SSH failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "id": "6bdb921d-dc8b-43d9-ab50-33bbb80f7247"
     },
     {
       "parameters": {
         "chatId": "<TELEGRAM_CHAT_ID>",
-        "text": "=✅ SecureNet – Backup diario OK  📦 Archivo: {{$json.backupFile || \"OK (archivo no detectado)\"}} 🕒 Fecha: {{$now.toLocaleString()}}  📍 S3: <YOUR_S3_BUCKET>/daily/",
-        "additionalFields": {}
+        "text": "={{ String($json.ok\n  ? '✅ SecureNet | Backup diario OK\\n\\n📦 ' + $json.file + '\\n🕒 ' + $now.toFormat('yyyy-MM-dd HH:mm') + '\\n☁️ Cifrado (AES-256) y subido a S3'\n  : '❌ SecureNet | Backup FALLIDO\\n\\n🔢 Código de salida: ' + $json.exitCode + '\\n🕒 ' + $now.toFormat('yyyy-MM-dd HH:mm') + '\\n\\nÚltimas líneas:\\n' + $json.tail).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
       },
+      "name": "Send Telegram",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        624,
-        0
+        660,
+        200
       ],
-      "id": "3d12be0c-4a70-49ad-b164-c1e4cef0b718",
-      "name": "Send a text message",
+      "id": "94bd6881-6e5e-4d19-8bd3-b97833929736",
       "credentials": {
         "telegramApi": {
           "id": "<CREDENTIAL_ID>",
@@ -77,29 +100,47 @@
       "main": [
         [
           {
-            "node": "Execute a command",
+            "node": "Run backup.sh",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Execute a command": {
+    "Run backup.sh": {
       "main": [
         [
           {
-            "node": "Code in JavaScript",
+            "node": "Parse result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SSH failed",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code in JavaScript": {
+    "Parse result": {
       "main": [
         [
           {
-            "node": "Send a text message",
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH failed": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram",
             "type": "main",
             "index": 0
           }
@@ -107,9 +148,13 @@
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "<ERROR_WORKFLOW_ID>"
   },
-  "active": true
+  "tags": []
 }

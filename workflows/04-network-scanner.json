@@ -1,97 +1,182 @@
 {
-  "name": "SecureNet - WF4 Escáner de Red",
+  "name": "SecureNet - WF4 Network scanner",
   "nodes": [
     {
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "minutes",
-              "minutesInterval": 30
+              "field": "cronExpression",
+              "expression": "0 5,35 * * * *"
             }
           ]
         }
       },
+      "name": "Every 30 min (:05, :35)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        -304,
-        -16
+        0,
+        200
       ],
-      "id": "84e44fb2-3dfc-422b-bbc2-0fbb939bf933",
-      "name": "Schedule Trigger"
+      "id": "2031c419-2254-457d-a126-060d379a332c"
     },
     {
       "parameters": {
         "fileSelector": "/home/node/.n8n-files/scan.txt",
-        "options": {
-          "fileExtension": "data"
-        }
+        "options": {}
       },
+      "name": "Read scan.txt",
       "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1.1,
+      "typeVersion": 1,
       "position": [
-        -96,
-        -16
+        200,
+        200
       ],
-      "id": "0a2b2931-e45e-449a-914d-e1ef50e2d5b2",
-      "name": "Read/Write Files from Disk"
+      "id": "c12a3675-8cc7-4ffe-add8-4af4d5b15e63"
     },
     {
       "parameters": {
         "operation": "text",
-        "destinationKey": "Text",
+        "destinationKey": "scan",
         "options": {}
       },
+      "name": "Scan to text",
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
       "position": [
-        112,
-        -16
+        400,
+        200
       ],
-      "id": "b20bc960-fca1-4fe2-a0b9-f516a159c76f",
-      "name": "Extract from File"
+      "id": "1137e552-2992-4fbf-bd1c-2320f0b064b5"
     },
     {
       "parameters": {
-        "jsCode": "// En tu input, el texto viene en $json.Text (por el nodo Extract from File)\nconst text = $json.Text || $json.text || $json.data || \"\";\n\n// Separamos por cada host detectado\nconst blocks = text.split(\"Nmap scan report for \").slice(1);\n\nconst devices = [];\n\nfor (const block of blocks) {\n\n  // Caso 1: \"hostname (192.168.2.1)\"\n  // Caso 2: \"192.168.2.10\"\n  let ip = null;\n\n  const ipParen = block.match(/\\((\\d+\\.\\d+\\.\\d+\\.\\d+)\\)/);\n  const ipPlain = block.match(/^(\\d+\\.\\d+\\.\\d+\\.\\d+)/m);\n\n  if (ipParen) ip = ipParen[1];\n  else if (ipPlain) ip = ipPlain[1];\n\n  // MAC + vendor\n  const macMatch = block.match(/MAC Address:\\s*([A-F0-9:]+)\\s*\\((.*?)\\)/i);\n\n  if (ip) {\n    devices.push({\n      ip,\n      mac: macMatch ? macMatch[1].toUpperCase() : \"UNKNOWN\",\n      vendor: macMatch ? macMatch[2] : \"Unknown\"\n    });\n  }\n}\n\n// Si no hay nada, devolvemos un item informativo (para debug)\nif (devices.length === 0) {\n  return [{ json: { error: \"No devices parsed\", hint: \"Check input text field name\", sample: text.slice(0, 200) } }];\n}\n\n// Devolvemos 1 item por dispositivo\nreturn devices.map(d => ({ json: d }));"
+        "fileSelector": "/home/node/.n8n-files/known_devices.json",
+        "options": {}
       },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "name": "Read known_devices.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
       "position": [
-        320,
-        -16
+        600,
+        200
       ],
-      "id": "a85aa058-1ee1-46b9-9fd2-9ba5c7c29426",
-      "name": "Code in JavaScript"
+      "id": "b9be856d-f9a8-43b4-9428-49427c2a0507"
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all().map(i => i.json);\n\nconst lines = items.map(d => `• IP: ${d.ip} | MAC: ${d.mac} | Vendor: ${d.vendor}`);\n\nreturn [{\n  json: {\n    count: items.length,\n    summary: lines.join('\\n')\n  }\n}];"
+        "operation": "text",
+        "destinationKey": "baseline",
+        "options": {}
       },
+      "name": "Baseline to text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        200
+      ],
+      "id": "dd068db6-220d-4b0e-b3d1-9d78aec6b36d"
+    },
+    {
+      "parameters": {
+        "jsCode": "// B2: alert only on devices that are not in the baseline (MAC -> first seen)\nconst scan = String($('Scan to text').first().json.scan ?? '');\n\n// Refuse to work on a stale scan (cron broken) instead of re-reporting old data\nconst header = scan.match(/^=== SecureNet scan (\\S+) ===/m);\nconst scannedAt = header ? new Date(header[1]) : null;\nif (!scannedAt || isNaN(scannedAt) || Date.now() - scannedAt.getTime() > 45 * 60 * 1000) {\n  throw new Error(`scan.txt is stale or has no timestamp (${header ? header[1] : 'none'}): check the cron job on PC2`);\n}\n\nconst devices = [];\nfor (const block of scan.split('Nmap scan report for ').slice(1)) {\n  const ip = (block.match(/\\((\\d+\\.\\d+\\.\\d+\\.\\d+)\\)/) || block.match(/^(\\d+\\.\\d+\\.\\d+\\.\\d+)/m) || [])[1];\n  if (!ip) continue;\n  const mm = block.match(/MAC Address:\\s*([0-9A-F:]{17})\\s*\\((.*?)\\)/i);\n  const mac = mm ? mm[1].toUpperCase() : null;          // nmap shows no MAC for the scanning host\n  devices.push({ key: mac ?? `IP:${ip}`, ip, mac: mac ?? 'own host', vendor: mm ? mm[2] : '—' });\n}\nif (devices.length === 0) throw new Error('scan.txt parsed 0 hosts');\n\nlet baseline = {};\ntry {\n  const b = JSON.parse($json.baseline || '{}');\n  if (b && !Array.isArray(b) && typeof b === 'object') baseline = b;\n} catch (e) { baseline = {}; }\nconst firstRun = Object.keys(baseline).length === 0;\n\nconst now = new Date().toISOString();\nconst newDevices = [];\nfor (const d of devices) {\n  if (!baseline[d.key]) {\n    baseline[d.key] = { ip: d.ip, mac: d.mac, vendor: d.vendor, firstSeen: now, lastSeen: now };\n    newDevices.push(d);\n  } else {\n    Object.assign(baseline[d.key], { ip: d.ip, lastSeen: now });\n  }\n}\n\nreturn [{ json: {\n  firstRun, scannedAt: scannedAt.toISOString(), seen: devices.length,\n  known: Object.keys(baseline).length, newDevices,\n  notify: firstRun || newDevices.length > 0,\n  baselineText: JSON.stringify(baseline, null, 2) + '\\n',\n} }];"
+      },
+      "name": "Compare with baseline",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        528,
-        -16
+        1000,
+        200
       ],
-      "id": "68ca66a7-61e6-48bf-b002-f32af5444509",
-      "name": "Code in JavaScript1"
+      "id": "0ae061db-6095-44aa-9174-921d676364ee"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "baselineText",
+        "options": {
+          "fileName": "known_devices.json",
+          "encoding": "utf8"
+        }
+      },
+      "name": "Baseline to file",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1220,
+        320
+      ],
+      "id": "1ab19ae9-9f74-40c8-8bc6-0ad0c269b082"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/home/node/.n8n-files/known_devices.json",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "name": "Save known_devices.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        320
+      ],
+      "id": "c2061c6e-7fe0-4c20-b557-479e55d93c91"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "83134b35-63e4-476f-a58d-c223da7caf30",
+              "leftValue": "={{ $json.notify }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "New devices?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1220,
+        120
+      ],
+      "id": "9a52b6ef-0952-4bb1-b514-88e9a48ef623"
     },
     {
       "parameters": {
         "chatId": "<TELEGRAM_CHAT_ID>",
-        "text": "=🚨 SecureNet - Nuevos dispositivos detectados\n\nTotal: {{$json.count}}\n\n{{$json.summary}}",
-        "additionalFields": {}
+        "text": "={{ String(($json.firstRun\n    ? '📋 SecureNet | Línea base de red creada (' + $json.known + ' dispositivos)'\n    : '🚨 SecureNet | ' + $json.newDevices.length + ' dispositivo(s) NUEVO(S) en la red')\n  + '\\n\\n' + $json.newDevices.map(d => '• ' + d.ip + ' | ' + d.mac + ' | ' + d.vendor).join('\\n')\n  + '\\n\\n🕒 Escaneo: ' + $json.scannedAt + '\\n📚 Conocidos: ' + $json.known).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
       },
+      "name": "Send Telegram",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        736,
-        -16
+        1440,
+        100
       ],
-      "id": "5f3697af-eaea-441e-b9e9-8c0653600e9b",
-      "name": "Send a text message",
+      "id": "85f8c0ab-716b-473c-b151-ebe6c906c676",
       "credentials": {
         "telegramApi": {
           "id": "<CREDENTIAL_ID>",
@@ -101,55 +186,93 @@
     }
   ],
   "connections": {
-    "Schedule Trigger": {
+    "Every 30 min (:05, :35)": {
       "main": [
         [
           {
-            "node": "Read/Write Files from Disk",
+            "node": "Read scan.txt",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Read/Write Files from Disk": {
+    "Read scan.txt": {
       "main": [
         [
           {
-            "node": "Extract from File",
+            "node": "Scan to text",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract from File": {
+    "Scan to text": {
       "main": [
         [
           {
-            "node": "Code in JavaScript",
+            "node": "Read known_devices.json",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code in JavaScript": {
+    "Read known_devices.json": {
       "main": [
         [
           {
-            "node": "Code in JavaScript1",
+            "node": "Baseline to text",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code in JavaScript1": {
+    "Baseline to text": {
       "main": [
         [
           {
-            "node": "Send a text message",
+            "node": "Compare with baseline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare with baseline": {
+      "main": [
+        [
+          {
+            "node": "Baseline to file",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "New devices?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baseline to file": {
+      "main": [
+        [
+          {
+            "node": "Save known_devices.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New devices?": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram",
             "type": "main",
             "index": 0
           }
@@ -157,9 +280,13 @@
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "<ERROR_WORKFLOW_ID>"
   },
-  "active": true
+  "tags": []
 }
