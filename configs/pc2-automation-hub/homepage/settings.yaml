@@ -11,17 +11,18 @@ cardBlur: md
 statusStyle: dot
 hideVersion: true
 useEqualHeights: true
+disableCollapse: true    # no chevron next to the group titles
 target: _blank
 
 background:
   image: /images/background.svg
   opacity: 100
 
-# Groups are laid out as four columns; each one has its own icon
+# Four columns; short titles so none of them wraps at 1920x1080
 layout:
-  Seguridad de red:
+  Seguridad:
     icon: mdi-shield-lock-outline
-  Monitorización y automatización:
+  Monitorización:
     icon: mdi-chart-timeline-variant
   Servicios:
     icon: mdi-cloud-lock-outline
@@ -29,12 +30,8 @@ layout:
     icon: mdi-tools
   Infraestructura:
     icon: mdi-docker
-  # bookmarks: four groups side by side under the services
-  Proyecto:
-    icon: mdi-source-repository
-  Estado y alertas:
-    icon: mdi-bell-ring-outline
-  Documentación técnica:
-    icon: mdi-book-open-variant
-  Plataforma:
-    icon: mdi-server-network
+  # bookmarks: a single row of four links, no group header
+  Enlaces:
+    style: row
+    columns: 4
+    header: false

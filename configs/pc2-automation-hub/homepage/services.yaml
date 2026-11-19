@@ -4,7 +4,7 @@
 # a read-only socket proxy. PC1 services run on bare metal, so their dot is a ping to the
 # gateway (host reachable), not a per-service check; Uptime Kuma monitors Pi-hole itself.
 
-- Seguridad de red:
+- Seguridad:
     - Pi-hole:
         icon: pi-hole.png
         href: http://192.168.2.10/admin/
@@ -32,14 +32,13 @@
         icon: mdi-wall-fire
         description: Política por defecto denegar en PC1 y PC2 · Docker filtrado en DOCKER-USER
 
-- Monitorización y automatización:
+- Monitorización:
     - Uptime Kuma:
         icon: uptime-kuma.png
         href: http://192.168.2.20:3001/status/securenet
         description: Comprobaciones cada 20 s y alertas directas a Telegram
         server: securenet-docker
         container: uptime-kuma
-        showStats: true
         widget:
           type: uptimekuma
           url: http://uptime-kuma:3001
@@ -51,7 +50,6 @@
         description: Autorrecuperación, alertas, escáner de red, backups e informe diario
         server: securenet-docker
         container: n8n
-        showStats: true
 
 # "Gestión" is nested inside "Servicios" so both share the third column
 - Servicios:
@@ -61,7 +59,6 @@
         description: Nube privada · servicio de prueba para las demos
         server: securenet-docker
         container: nextcloud
-        showStats: true
         widget:
           type: nextcloud
           url: http://192.168.2.20:8080
@@ -70,7 +67,7 @@
 
     - Gestión:
         - Portainer:
-            icon: portainer-dark.png      # light "P" variant, made for dark themes
+            icon: si-portainer-#13BEF9    # Simple Icons glyph: no white tile behind it
             href: https://192.168.2.20:9443
             description: Parado por defecto · se arranca solo para tareas de administración
             server: securenet-docker

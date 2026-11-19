@@ -47,9 +47,9 @@ Closes the rest of the [post-delivery review](docs/08-security-review.md) that c
   - status dots for the PC1 services (ping to the gateway);
   - Portainer shows a grey "stopped" dot;
   - *Gestión* sits under *Servicios*.
-  - New *Infraestructura* column: MariaDB, both Docker socket proxies and Homepage itself, with live CPU/RAM/network per container read through the read-only proxy.
+  - New *Infraestructura* column: MariaDB, both Docker socket proxies and Homepage itself; MariaDB and Homepage show live CPU/RAM/network read through the read-only proxy. Kuma, n8n and Nextcloud show only their own data.
   - The UFW firewall gets its own card.
-  - Bookmarks: project docs, status and alert pages, and official documentation of each tool.
+  - One row of links (repository, security review, status page, n8n executions); short group titles, no collapse chevrons, Portainer as a plain glyph, everything fits in 1920x1080.
 
 ### Still open
 
