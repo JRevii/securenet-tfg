@@ -69,7 +69,51 @@ After publishing the project, a reviewer asked two questions: *"If n8n goes down
 | New | Error workflow ([07-error-handler.json](../workflows/07-error-handler.json)): any failed workflow sends a Telegram alert | A scheduled test workflow that throws → alert with workflow, node and error. First real catch: *Pi-hole Stats* pointing to a deleted Telegram credential after the token rotation |
 | — | Telegram tokens rotated; one bot for Kuma, another for n8n | — |
 
-Still open, and planned for v2: S1 (webhook authentication) is next; everything still runs on one host, so if PC2 itself goes down nobody is alerted (v2: external watchdog in AWS).
+Still open at that point: S1 (webhook authentication) was next (done below); everything still runs on one host, so if PC2 itself goes down nobody is alerted (v2: external watchdog in AWS).
+
+## Fixed in v1.1 final (19 November 2026)
+
+Same rule as before: every row was applied to the running lab and verified there. Telegram delivery was checked in n8n's execution data (the Telegram node finished successfully) and in Uptime Kuma's logs.
+
+### Security
+
+| # | Fix | How it was verified |
+|---|---|---|
+| S1 | Both webhooks require Header Auth (`X-SecureNet-Key`), with **one key per sender**, plus an IP allow-list: `192.168.2.10` for `fail2ban`, and the Docker bridge gateway `172.18.0.1` for `kuma-alert` (Kuma reaches n8n through the published port, so docker-proxy rewrites the source). The keys were generated on the servers (`openssl rand`, root 600) and piped into n8n credentials and into Kuma's headers, never displayed. Fail2Ban passes its key to curl through stdin, so it stays out of the config file and `ps`. The legacy `UptimeKumaN8N` workflow is deleted. | No key → 403, wrong key → 403 (from the allowed IP), right key from a non-allowed IP → 403, right key + allowed IP → 200. Real ban (`fail2ban-client set sshd banip`) → alert sent. `docker stop homepage` → Kuma → n8n → restart → alert. `/webhook/uptimekuma` → 404 |
+| S5 | UFW `deny incoming` on both VMs, with SSH allowed first. PC1 only accepts SSH, DNS and Pi-hole web from the lab and the VPN, plus WireGuard and VPN→lab forwarding. PC2 adds SSH from the Docker network (backup) and container→published-port traffic. **Docker publishes ports through its own iptables chains and skips UFW**, so `DOCKER-USER` (in `/etc/ufw/after.rules`) only lets the lab and the VPN open new connections to containers. Applied with a 3-minute automatic rollback. | From a temporary non-lab address on PC1 (masquerading disabled for it, return route added on PC2): 3000/5678/8080 → no answer, logged as `[DOCKER-USER BLOCK]`; 22 → `[UFW BLOCK]`. From the lab: everything answers. New SSH session works |
+| S6 | `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `AuthenticationMethods publickey`, `PermitRootLogin no` in `00-securenet-hardening.conf`, loaded before cloud-init's file (first value wins). The backup user is out of the `docker` group and its password is locked. n8n uses an ed25519 key with `restrict,from="172.18.0.0/16",command="sudo -n /opt/securenet/backup.sh"`, and a single sudo rule allows that script. The private key went straight from PC2 into an n8n credential and was shredded on PC2. | Key login checked in a second session before cancelling the rollback; `ssh -o PubkeyAuthentication=no` → `Permission denied (publickey)` on both VMs. The backup runs from n8n with the key (through UFW) |
+| S7 | Compose secrets moved to `/root/securenet/.env` (root 600). `NODE_FUNCTION_ALLOW_BUILTIN=fs` removed from n8n. Pi-hole: **admin password rotated** (it was exposed during this work), and n8n uses a separate Pi-hole *app password* stored as a Custom Auth credential, instead of the admin password inside the workflow. Homepage keys only as `HOMEPAGE_VAR_*`. All Uptime Kuma API keys revoked. WireGuard key files set to 600 | `docker exec n8n printenv NODE_FUNCTION_ALLOW_BUILTIN` → unset. The exported workflows contain no password, token, chat ID or credential ID (checked by the export script) |
+| S3 | Homepage no longer mounts `/var/run/docker.sock`: it gets the container list from a **second** socket proxy (`CONTAINERS=1`, `POST=0`, no restarts) on an `internal: true` network that only it can reach. n8n's proxy is not shared. Portainer (read-write socket) is in a `manual` profile: stopped by default, HTTPS only (`9000` removed), and its Kuma monitor is paused | `homepage-docker` network: internal, containing only `homepage` and `homepage-socket-proxy`. Status dots work |
+| S8 | Every image pinned to the exact version that was running, by tagging the local image, so nothing was upgraded by surprise: n8n 2.4.4, Uptime Kuma 1.23.17, Homepage v1.10.1, Portainer 2.33.6, MariaDB 11.8.6, Nextcloud 29.0.16, socket-proxy 3.4.7-r0-ls105 | `docker ps` shows the pinned tags |
+
+### Functional
+
+| # | Root cause confirmed | Fix | How it was verified |
+|---|---|---|---|
+| B5 | Execution 446: a PIHOLE `DOWN` (no container) became `ERROR` and went out the IF's false branch, and the user got "SERVICIO RECUPERADO". Kuma test messages (`INFO`) did the same | A *Classify* node sets an explicit action: `RESTART`, `ALERT` (alert only: Pi-hole is on PC1, or unknown monitor), `RECOVERED`, `INFO` or `INVALID`. Nextcloud is mapped; n8n and Kuma are never restarted. Kuma now sends its real heartbeat `status` (0/1) and an escaped `msg` (`{{ msg \| json }}`) | Synthetic DOWN/UP/INFO/INVALID events from the Kuma container, plus a real `docker stop homepage`: each one gives the right message |
+| B7 | All 16 stored executions left `If drop` through the *true* branch: `"false "` (trailing space) compared loosely with `true` is true. Also, `staticData` was `null` in the database: n8n 2.x runs Code nodes in a task runner and does not persist `$getWorkflowStaticData` from them, so de-duplication never had any memory | *Remove Duplicates* node (history kept in n8n's database) on `monitor\|status\|time window` | Two identical DOWNs 3 s apart: the second stops at *Drop duplicates* |
+| B8 | Header name `" X-FTL-CSRF"`, SID with a leading space, restart URL ending in `\n` | Clean `X-FTL-SID` only (CSRF is not needed with header auth); logout after each run; clean URL | Pi-hole run OK; only a few short-lived sessions remain in Pi-hole |
+| B1 | `"={{ ... }}"` inside an expression, and templates starting with `=={{` | No nested markers; messages are built as plain text and HTML-escaped | Messages without `=` |
+| B4 | The Code node looked for `EXIT_CODE:`, which the script never printed, and the message ignored the result. Failed runs also left plain-text DB dumps in `tmp/` | `backup.sh` checks the AWS credentials first, cleans up in an `EXIT` trap, uses `umask 077` and always prints `EXIT_CODE:n`. The workflow reports OK/FAILED and has an SSH error branch | Run from n8n: **"Backup FALLIDO, exit 3, AWS credentials expired"** instead of "OK" |
+| B3 | The counters lived in WF6's own static data, which nothing else could write to | WF2 and WF5 append to `/home/node/.n8n-files/events.jsonl`; WF6 counts today's lines | Report showed 3 bans / 5 outages / last service Homepage, matching the tests |
+| B2 | WF4 never compared against anything | `known_devices.json` baseline by MAC; alert only on new devices (first run: one baseline message). `scan.sh` writes atomically with an ISO timestamp; n8n reads at :05/:35 and rejects a scan older than 45 min | First run: baseline of 3; second run: no message |
+| B9 | No status page existed | Status page `securenet` (dark, grouped by machine) used by the Homepage widget | Widget shows sites up/down; [screenshot](../assets/screenshots/uptime-kuma-status-page.png) |
+| B10 | Template bookmarks, stray `}` | Homepage rebuilt: four groups with icons, real Pi-hole v6 / Uptime Kuma / Nextcloud (read-only serverinfo token) widgets, status dots, generated background and favicon | [Screenshot](../assets/screenshots/homepage-dashboard-v1.1.png), no "Missing" or "API Error" |
+| B12 | List 1 was StevenBlack as a block list. Lists 2–4 (StevenBlack again, AdguardDNS, KADhosts) were **allow** lists (`type=1`): instead of blocking those domains, they let them through | Duplicate removed; AdguardDNS and KADhosts re-added as block lists | Gravity: 68,449 → 279,806 unique domains; `doubleclick.net` → `0.0.0.0` |
+| B13 | Default 00:00 schedules while the VMs were off | Backup at 20:30, report at 21:00 (Europe/Madrid), scanner at :05/:35 | Schedules visible through the API |
+| D2 | PC1 and PC2 used 8.8.8.8 | netplan: Pi-hole first, 1.1.1.1 only as fallback (so Kuma can still reach Telegram if PC1 dies); the NAT adapter no longer injects DNS. Applied with an automatic rollback | Pi-hole went from 0 to 74 queries in minutes; `doubleclick.net` blocked from PC2 |
+| B16 (new) | Executions 419/435/453: every restart ended in an error in the HTTP node (Docker answers `204 No Content`), so **the outage alert was never sent** | The node reads a text response and the message reports the real status code, or the failure | Real restart → `HTTP 204` in the alert |
+| B17 (new) | *Pi-hole Stats* still pointed to a deleted credential. The v1.1 fix only worked in one manual run; scheduled runs kept failing | Credential reassigned in the saved workflow | Scheduled run OK |
+| B18 (new) | The Telegram node sends Markdown; `monitor_code`, file names and error texts with `_` failed with *can't parse entities*, **including the error handler's own alert** | Every message is sent as HTML with `& < >` escaped | INVALID event and a test error containing `_ < > &` delivered |
+| B14 | — | Not defined anywhere in the repository; nothing was changed under this ID | — |
+
+### Still open
+
+- **S3 upload**: the AWS Academy credentials expired on 18 Oct 2026 (`ExpiredToken`). The workflow now says so; new credentials are needed to get a green backup.
+- **S4** TLS, **D1** VPN from a separate network, **D3** complete backups with restore tests, and the single-host problem: v2.
+- Nextcloud 29 is end-of-life. It is pinned, not upgraded: a major-version upgrade needs its own plan.
+- n8n's encryption key and the MariaDB passwords were moved, not rotated (rotating them means re-encrypting the credentials and changing database users).
+- Uptime Kuma 1.x weights each heartbeat by the time since the previous one, so the first heartbeat after the VMs were powered off counts as a long outage (n8n showed 5 % with 0 DOWN beats). It corrects itself after 24 h of uptime.
 
 ## v2 roadmap
 
