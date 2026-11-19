@@ -43,6 +43,8 @@
           type: uptimekuma
           url: http://uptime-kuma:3001
           slug: securenet
+          # no "uptime": Kuma 1.x counts the time the VMs were powered off as downtime
+          fields: ["up", "down"]
 
     - n8n:
         icon: n8n.png
@@ -50,6 +52,35 @@
         description: Autorrecuperación, alertas, escáner de red, backups e informe diario
         server: securenet-docker
         container: n8n
+
+    # "Infraestructura" is nested under "Monitorización" (centre column): what runs behind
+    # the services, showing least privilege at a glance
+    - Infraestructura:
+        - MariaDB:
+            icon: mariadb.png
+            description: Base de datos de Nextcloud · sin puertos publicados
+            server: securenet-docker
+            container: nextcloud-db
+            showStats: true
+
+        - Proxy Docker de n8n:
+            icon: linuxserver-io.png
+            description: Solo listar y reiniciar (POST=0) · crear → 403
+            server: securenet-docker
+            container: docker-socket-proxy
+
+        - Proxy Docker de Homepage:
+            icon: linuxserver-io.png
+            description: Solo lectura, en una red interna aislada
+            server: securenet-docker
+            container: homepage-socket-proxy
+
+        - Homepage:
+            icon: homepage.png
+            description: Este panel · sin acceso directo al socket de Docker
+            server: securenet-docker
+            container: homepage
+            showStats: true
 
 # "Gestión" is nested inside "Servicios" so both share the third column
 - Servicios:
@@ -72,31 +103,3 @@
             description: Parado por defecto · se arranca solo para tareas de administración
             server: securenet-docker
             container: portainer          # stopped -> grey dot (custom.css)
-
-# What runs behind the services: shows least privilege at a glance
-- Infraestructura:
-    - MariaDB:
-        icon: mariadb.png
-        description: Base de datos de Nextcloud · sin puertos publicados
-        server: securenet-docker
-        container: nextcloud-db
-        showStats: true
-
-    - Proxy Docker de n8n:
-        icon: linuxserver-io.png
-        description: Solo listar y reiniciar (POST=0) · crear → 403
-        server: securenet-docker
-        container: docker-socket-proxy
-
-    - Proxy Docker de Homepage:
-        icon: linuxserver-io.png
-        description: Solo lectura, en una red interna aislada
-        server: securenet-docker
-        container: homepage-socket-proxy
-
-    - Homepage:
-        icon: homepage.png
-        description: Este panel · sin acceso directo al socket de Docker
-        server: securenet-docker
-        container: homepage
-        showStats: true
