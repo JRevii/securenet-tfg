@@ -18,7 +18,7 @@ Closes the rest of the [post-delivery review](docs/08-security-review.md) that c
 
 ### Fixed
 
-- **B1** — no stray `=` in messages. Every Telegram message is now sent as escaped HTML (see B18).
+- **B1** — no stray `=` in messages. Every Telegram message is now sent as escaped HTML (see B17).
 - **B2** — the network scanner keeps a MAC baseline and alerts only on new devices. The scan is written atomically, and a stale scan raises an error.
 - **B3** — the daily report counts real bans and outages from a shared event log.
 - **B4** — the backup reports its real exit status and cleans up its plain-text temp files. A failure is announced as a failure.
@@ -30,15 +30,14 @@ Closes the rest of the [post-delivery review](docs/08-security-review.md) that c
 - **B12** — duplicate blocklist removed. Two blocklists had been added as **allow** lists; they are block lists again (68k → 280k domains).
 - **B13** — the backup runs at 20:30 and the report at 21:00, when the lab is usually up.
 - **D2** — both VMs resolve DNS through Pi-hole.
-- **B16 (new)** — the restart node failed on Docker's `204 No Content`, so the outage alert was never sent.
-- **B17 (new)** — *Pi-hole Stats* still pointed to a deleted Telegram credential. The v1.1 fix had only worked in a manual run.
-- **B18 (new)** — Telegram parsed messages as Markdown, so any `_` broke them, including the error-handler alert itself.
+- **B14** — the INCIDENT alert never arrived (first seen in the 18/10/2026 demo, tracked in the SecureNet v2 backlog). The original hypothesis was broken Markdown. The confirmed cause: the restart node treated Docker's `204 No Content` as an error, so the outage alert was never sent. Markdown was also breaking some messages (B17).
+- **B16 (new)** — *Pi-hole Stats* still pointed to a deleted Telegram credential. The v1.1 fix had only worked in a manual run.
+- **B17 (new)** — Telegram parsed messages as Markdown, so any `_` broke them, including the error-handler alert itself.
 
 ### Still open
 
 - **Backups cannot reach S3**: the AWS Academy credentials expired (`ExpiredToken`). The workflow now reports this correctly. New credentials are needed.
 - S4 (TLS), D1 (VPN from a separate network), D3 (complete backups, restore tests) and the single-host limitation are planned for v2.
-- **B14** has no definition anywhere in the repository, so it was not "fixed".
 
 ## v1.1 — 2026-11-13
 

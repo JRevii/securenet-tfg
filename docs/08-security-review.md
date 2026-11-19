@@ -102,10 +102,9 @@ Same rule as before: every row was applied to the running lab and verified there
 | B12 | List 1 was StevenBlack as a block list. Lists 2–4 (StevenBlack again, AdguardDNS, KADhosts) were **allow** lists (`type=1`): instead of blocking those domains, they let them through | Duplicate removed; AdguardDNS and KADhosts re-added as block lists | Gravity: 68,449 → 279,806 unique domains; `doubleclick.net` → `0.0.0.0` |
 | B13 | Default 00:00 schedules while the VMs were off | Backup at 20:30, report at 21:00 (Europe/Madrid), scanner at :05/:35 | Schedules visible through the API |
 | D2 | PC1 and PC2 used 8.8.8.8 | netplan: Pi-hole first, 1.1.1.1 only as fallback (so Kuma can still reach Telegram if PC1 dies); the NAT adapter no longer injects DNS. Applied with an automatic rollback | Pi-hole went from 0 to 74 queries in minutes; `doubleclick.net` blocked from PC2 |
-| B16 (new) | Executions 419/435/453: every restart ended in an error in the HTTP node (Docker answers `204 No Content`), so **the outage alert was never sent** | The node reads a text response and the message reports the real status code, or the failure | Real restart → `HTTP 204` in the alert |
-| B17 (new) | *Pi-hole Stats* still pointed to a deleted credential. The v1.1 fix only worked in one manual run; scheduled runs kept failing | Credential reassigned in the saved workflow | Scheduled run OK |
-| B18 (new) | The Telegram node sends Markdown; `monitor_code`, file names and error texts with `_` failed with *can't parse entities*, **including the error handler's own alert** | Every message is sent as HTML with `& < >` escaped | INVALID event and a test error containing `_ < > &` delivered |
-| B14 | — | Not defined anywhere in the repository; nothing was changed under this ID | — |
+| B14 | The INCIDENT alert never arrived (18/10/2026 demo; hypothesis: broken Markdown). Confirmed cause, executions 419/435/453: every restart ended in an error in the HTTP node (Docker answers `204 No Content`), so **the outage alert was never sent** | The node reads a text response and the message reports the real status code, or the failure | Real restart → `HTTP 204` in the alert |
+| B16 (new) | *Pi-hole Stats* still pointed to a deleted credential. The v1.1 fix only worked in one manual run; scheduled runs kept failing | Credential reassigned in the saved workflow | Scheduled run OK |
+| B17 (new) | The Telegram node sends Markdown; `monitor_code`, file names and error texts with `_` failed with *can't parse entities*, **including the error handler's own alert** | Every message is sent as HTML with `& < >` escaped | INVALID event and a test error containing `_ < > &` delivered |
 
 ### Still open
 
