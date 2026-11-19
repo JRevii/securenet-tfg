@@ -16,8 +16,38 @@
   border: 1px solid rgb(148 163 184 / 0.12);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
+/* Portainer is stopped on purpose: show its "Terminado" (exited) dot in grey, not orange.
+   Homepage labels the status div "docker-status-<translated status>". */
+.docker-status-terminado .rounded-full,
+.docker-status-exited .rounded-full {
+  background-color: rgb(100 116 139) !important;   /* slate-500 */
+}
+
 .service-card:hover {
   border-color: rgb(var(--sn-accent) / 0.45);
   box-shadow: 0 10px 28px rgb(0 0 0 / 0.35), 0 0 0 1px rgb(var(--sn-accent) / 0.15);
   transform: translateY(-2px);
+}
+
+/* Scale the whole dashboard a little (Tailwind sizes are in rem) so the
+   1920x1080 view is filled. Above ~19px long group titles start to wrap. */
+html {
+  font-size: 18.5px;
+}
+
+/* More breathing room for the bookmarks, which fills the bottom of the screen */
+#services {
+  margin-top: 0.75rem !important;
+}
+#bookmarks {
+  margin-top: 3rem !important;
+}
+.bookmark-name,
+.bookmark-description {
+  padding-top: 0.95rem !important;
+  padding-bottom: 0.95rem !important;
+}
+.bookmark-group-name {
+  letter-spacing: 0.04em;
+  color: rgb(var(--sn-accent) / 0.95);
 }

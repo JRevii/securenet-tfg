@@ -106,6 +106,15 @@ Same rule as before: every row was applied to the running lab and verified there
 | B16 (new) | *Pi-hole Stats* still pointed to a deleted credential. The v1.1 fix only worked in one manual run; scheduled runs kept failing | Credential reassigned in the saved workflow | Scheduled run OK |
 | B17 (new) | The Telegram node sends Markdown; `monitor_code`, file names and error texts with `_` failed with *can't parse entities*, **including the error handler's own alert** | Every message is sent as HTML with `& < >` escaped | INVALID event and a test error containing `_ < > &` delivered |
 
+### Clean-up
+
+| Item | What was done | Check |
+|---|---|---|
+| S7 · VPN client key | `client_privatekey` shredded on PC1: the server never needs a client's private key. The client's public key stays, because it is the active peer. **Still to do:** generate a new key pair on the client, then swap the peer's public key in `wg0.conf` (the old key sat on the server, so it should be considered exposed) | `ls /etc/wireguard`: no `client_privatekey`; `wg show wg0` still lists the peer (10.0.0.2/32) |
+| B4 / S7 · plain-text leftovers | Deleted the unencrypted `securenet_backup_2026-10-18_17-35-13.tar.gz` and the database dumps in `backups/tmp/` that failed v1 runs had left behind (the v1.1 script removes its own temp files in a trap) | Only `.tar.gz.enc` files and `logs/` remain in `/opt/securenet/backups` |
+| S7 · old copies of secrets | Deleted `docker-compose.yml.v1.0` (inline secrets), the old `workflows_export.json`, and the migration archive `/root/backups/securenet-compose-*.tgz` that contained both | `ls /root/securenet /root/backups` |
+| B10 · Homepage honesty | Nextcloud: "servicio de prueba para las demos" (backups to S3 are failing for now). WireGuard: "VPN del laboratorio" (remote access not proven, D1). PC1 services get a status dot: a ping to the gateway, i.e. host reachable, not a per-service check. Portainer shows a grey dot when stopped. *Gestión* is nested under *Servicios* | Screenshot after 24 h of Kuma uptime |
+
 ### Still open
 
 - **S3 upload**: the AWS Academy credentials expired on 18 Oct 2026 (`ExpiredToken`). The workflow now says so; new credentials are needed to get a green backup.

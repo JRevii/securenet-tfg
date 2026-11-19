@@ -6,14 +6,13 @@
     disk: /
     uptime: true
 
-- datetime:
+- greeting:
     text_size: xl
+    text: "SecureNet"
+
+- datetime:
     locale: es
     format:
       dateStyle: long
       timeStyle: short
       hour12: false
-
-- search:
-    provider: duckduckgo
-    target: _blank

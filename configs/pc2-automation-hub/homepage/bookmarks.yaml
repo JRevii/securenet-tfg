@@ -1,2 +1,14 @@
-# SecureNet v1.1 - no bookmarks (B10: template entries removed)
-[]
+# SecureNet v1.1 - a single row of links (no descriptions, so nothing gets truncated)
+- Enlaces:
+    - Repositorio:
+        - icon: github-light.png
+          href: https://github.com/JRevii/securenet-tfg
+    - Revisión de seguridad:
+        - icon: mdi-shield-search
+          href: https://github.com/JRevii/securenet-tfg/blob/main/docs/08-security-review.md
+    - Página de estado:
+        - icon: uptime-kuma.png
+          href: http://192.168.2.20:3001/status/securenet
+    - Ejecuciones de n8n:
+        - icon: n8n.png
+          href: http://192.168.2.20:5678/home/executions

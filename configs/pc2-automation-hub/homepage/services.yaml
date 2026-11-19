@@ -1,14 +1,17 @@
 # SecureNet v1.1 - Homepage services (https://gethomepage.dev/configs/services)
 # Widget secrets come from HOMEPAGE_VAR_* variables (/root/securenet/.env), never from this file.
-# Container status dots come from "securenet-docker" (docker.yaml): a read-only socket proxy.
+# Container status dots and CPU/RAM/network stats come from "securenet-docker" (docker.yaml):
+# a read-only socket proxy. PC1 services run on bare metal, so their dot is a ping to the
+# gateway (host reachable), not a per-service check; Uptime Kuma monitors Pi-hole itself.
 
-- Seguridad de red:
+- Seguridad:
     - Pi-hole:
         icon: pi-hole.png
         href: http://192.168.2.10/admin/
         description: DNS con filtrado de anuncios y malware · PC1
-        # No siteMonitor: Pi-hole's web server answers HEAD with a body and Node's
-        # strict HTTP parser rejects it. The widget below already proves it is up.
+        # ping instead of siteMonitor: Pi-hole's web server answers HEAD with a body
+        # and Node's strict HTTP parser rejects it
+        ping: 192.168.2.10
         widget:
           type: pihole
           url: http://192.168.2.10
@@ -17,13 +20,19 @@
 
     - WireGuard:
         icon: wireguard.png
-        description: VPN de acceso remoto al laboratorio · PC1
+        description: VPN del laboratorio · PC1
+        ping: 192.168.2.10
 
     - Fail2Ban:
         icon: fail2ban.png
         description: Bloqueo de fuerza bruta SSH con alerta en Telegram · PC1
+        ping: 192.168.2.10
 
-- Monitorización y automatización:
+    - Firewall (UFW):
+        icon: mdi-wall-fire
+        description: Política por defecto denegar en PC1 y PC2 · Docker filtrado en DOCKER-USER
+
+- Monitorización:
     - Uptime Kuma:
         icon: uptime-kuma.png
         href: http://192.168.2.20:3001/status/securenet
@@ -34,6 +43,8 @@
           type: uptimekuma
           url: http://uptime-kuma:3001
           slug: securenet
+          # no "uptime": Kuma 1.x counts the time the VMs were powered off as downtime
+          fields: ["up", "down"]
 
     - n8n:
         icon: n8n.png
@@ -42,21 +53,52 @@
         server: securenet-docker
         container: n8n
 
+    # "Gestión" is nested under "Monitorización", below n8n (centre column)
+    - Gestión:
+        - Portainer:
+            icon: si-portainer-#13BEF9    # Simple Icons glyph: no white tile behind it
+            href: https://192.168.2.20:9443
+            description: Parado por defecto · se arranca solo para tareas de administración
+            server: securenet-docker
+            container: portainer          # stopped -> grey dot (custom.css)
+
+# "Infraestructura" is nested inside "Servicios", below Nextcloud (right column)
 - Servicios:
     - Nextcloud:
         icon: nextcloud.png
         href: http://192.168.2.20:8080
-        description: Nube privada con copias cifradas en AWS S3
+        description: Nube privada · servicio de prueba para las demos
         server: securenet-docker
         container: nextcloud
         widget:
           type: nextcloud
           url: http://192.168.2.20:8080
           key: "{{HOMEPAGE_VAR_NEXTCLOUD_TOKEN}}"
-          fields: ["freespace", "activeusers", "numfiles", "numshares"]
+          fields: ["freespace", "numfiles"]
 
-- Gestión:
-    - Portainer:
-        icon: portainer.png
-        href: https://192.168.2.20:9443
-        description: Parado por defecto · se arranca solo para tareas de administración
+    # "Infraestructura" is nested under "Servicios", below Nextcloud (right column):
+    # what runs behind the services, showing least privilege at a glance
+    - Infraestructura:
+        - MariaDB:
+            icon: mariadb.png
+            description: Base de datos de Nextcloud · sin puertos publicados
+            server: securenet-docker
+            container: nextcloud-db
+
+        - Proxy Docker de n8n:
+            icon: linuxserver-io.png
+            description: Solo listar y reiniciar (POST=0) · crear → 403
+            server: securenet-docker
+            container: docker-socket-proxy
+
+        - Proxy Docker de Homepage:
+            icon: linuxserver-io.png
+            description: Solo lectura, en una red interna aislada
+            server: securenet-docker
+            container: homepage-socket-proxy
+
+        - Homepage:
+            icon: homepage.png
+            description: Este panel · sin acceso directo al socket de Docker
+            server: securenet-docker
+            container: homepage
