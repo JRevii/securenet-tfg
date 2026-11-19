@@ -34,6 +34,20 @@ Closes the rest of the [post-delivery review](docs/08-security-review.md) that c
 - **B16 (new)** — *Pi-hole Stats* still pointed to a deleted Telegram credential. The v1.1 fix had only worked in a manual run.
 - **B17 (new)** — Telegram parsed messages as Markdown, so any `_` broke them, including the error-handler alert itself.
 
+### Clean-up
+
+- **WireGuard:** the client's private key is deleted from PC1 (S7); the server only keeps the client's public key. *Pending:* regenerate the client's key pair **on the client**, because the old one sat on the server.
+- **Deleted leftovers that held secrets or plain-text data:**
+  - the unencrypted backup archive of 18 Oct and the database dumps left in `backups/tmp/` by failed runs;
+  - the pre-v1.1 compose file (inline secrets);
+  - an old `workflows_export.json`;
+  - the work archive taken during the migration.
+- **Homepage:**
+  - descriptions now match reality (Nextcloud is a demo service; remote VPN access is not proven yet, D1);
+  - status dots for the PC1 services (ping to the gateway);
+  - Portainer shows a grey "stopped" dot;
+  - *Gestión* sits under *Servicios*.
+
 ### Still open
 
 - **Backups cannot reach S3**: the AWS Academy credentials expired (`ExpiredToken`). The workflow now reports this correctly. New credentials are needed.
