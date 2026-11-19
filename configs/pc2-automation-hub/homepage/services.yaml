@@ -1,31 +1,62 @@
-- SecureNet:
+# SecureNet v1.1 - Homepage services (https://gethomepage.dev/configs/services)
+# Widget secrets come from HOMEPAGE_VAR_* variables (/root/securenet/.env), never from this file.
+# Container status dots come from "securenet-docker" (docker.yaml): a read-only socket proxy.
+
+- Seguridad de red:
     - Pi-hole:
-        icon: pi-hole
-        href: http://192.168.2.10/admin
-        description: DNS Filtering
+        icon: pi-hole.png
+        href: http://192.168.2.10/admin/
+        description: DNS con filtrado de anuncios y malware · PC1
+        # No siteMonitor: Pi-hole's web server answers HEAD with a body and Node's
+        # strict HTTP parser rejects it. The widget below already proves it is up.
+        widget:
+          type: pihole
+          url: http://192.168.2.10
+          version: 6
+          key: "{{HOMEPAGE_VAR_PIHOLE_KEY}}"
 
-    - n8n:
-        icon: n8n
-        href: http://192.168.2.20:5678
-        description: Automation Engine
+    - WireGuard:
+        icon: wireguard.png
+        description: VPN de acceso remoto al laboratorio · PC1
 
+    - Fail2Ban:
+        icon: fail2ban.png
+        description: Bloqueo de fuerza bruta SSH con alerta en Telegram · PC1
+
+- Monitorización y automatización:
     - Uptime Kuma:
-        icon: uptime-kuma
-        href: http://192.168.2.20:3001
-        description: Service Monitoring
+        icon: uptime-kuma.png
+        href: http://192.168.2.20:3001/status/securenet
+        description: Comprobaciones cada 20 s y alertas directas a Telegram
+        server: securenet-docker
+        container: uptime-kuma
         widget:
           type: uptimekuma
-          url: http://192.168.2.20:3001
-          # Si usas API key:
-          apiKey: <UPTIME_KUMA_API_KEY>  # removed; note: this widget actually needs "slug:" of a status page
-          # Si no, lo hacemos por statusPage/slug
+          url: http://uptime-kuma:3001
+          slug: securenet
 
-    - Portainer:
-        icon: portainer
-        href: https://192.168.2.20:9443
-        description: Docker Management
+    - n8n:
+        icon: n8n.png
+        href: http://192.168.2.20:5678
+        description: Autorrecuperación, alertas, escáner de red, backups e informe diario
+        server: securenet-docker
+        container: n8n
 
+- Servicios:
     - Nextcloud:
-        icon: nextcloud
+        icon: nextcloud.png
         href: http://192.168.2.20:8080
-        description: Secure Cloud Storage
+        description: Nube privada con copias cifradas en AWS S3
+        server: securenet-docker
+        container: nextcloud
+        widget:
+          type: nextcloud
+          url: http://192.168.2.20:8080
+          key: "{{HOMEPAGE_VAR_NEXTCLOUD_TOKEN}}"
+          fields: ["freespace", "activeusers", "numfiles", "numshares"]
+
+- Gestión:
+    - Portainer:
+        icon: portainer.png
+        href: https://192.168.2.20:9443
+        description: Parado por defecto · se arranca solo para tareas de administración

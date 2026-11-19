@@ -1,16 +1,25 @@
-# SecureNet v1 - PC2 "Automation Hub" (archived as delivered for the TFG, Feb 2026)
+# SecureNet v1.1 - PC2 "Automation Hub"
 # Path on the server: /root/securenet/docker-compose.yml
-# The only change from the original: secrets now come from .env (see .env.example).
-# Known weaknesses of this file are documented in docs/08-security-review.md.
+# Secrets come from /root/securenet/.env (root:root 600, never committed; see .env.example).
+#
+# v1.1 changes (docs/08-security-review.md):
+#   S3  Homepage no longer mounts the Docker socket: it reads container status through
+#       its own read-only socket proxy on an internal network. Portainer (rw socket) is
+#       stopped by default (profile "manual") and only exposes HTTPS.
+#   S7  No secret inline here; NODE_FUNCTION_ALLOW_BUILTIN=fs removed from n8n.
+#   S8  Every image pinned to the exact version that was running (no surprise upgrades).
+#
+# Start Portainer only when needed:
+#   docker compose --profile manual up -d portainer   ...   docker compose --profile manual stop portainer
 
 services:
   portainer:
-    image: portainer/portainer-ce:latest
+    image: portainer/portainer-ce:2.33.6
     container_name: portainer
-    restart: unless-stopped
+    profiles: ["manual"]
+    restart: "no"
     ports:
-      - "9000:9000"
-      - "9443:9443"
+      - "9443:9443"            # HTTPS only (plain-HTTP 9000 removed)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
@@ -18,7 +27,7 @@ services:
       - securenet
 
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.4.4
     container_name: n8n
     restart: unless-stopped
     ports:
@@ -26,36 +35,49 @@ services:
     environment:
       TZ: Europe/Madrid
       N8N_USER_FOLDER: /home/node/.n8n
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
-      N8N_SECURE_COOKIE: "false"
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?set in .env}
+      N8N_SECURE_COOKIE: "false"      # no TLS yet (S4, planned for v2)
       N8N_HOST: 192.168.2.20
       N8N_PORT: 5678
       N8N_PROTOCOL: http
       WEBHOOK_URL: http://192.168.2.20:5678
       N8N_EDITOR_BASE_URL: http://192.168.2.20:5678
       N8N_LISTEN_ADDRESS: 0.0.0.0
-      NODE_FUNCTION_ALLOW_BUILTIN: fs
     volumes:
       - securenet_n8n_data:/home/node/.n8n
       - /opt/n8n-files:/home/node/.n8n-files
     networks:
       - securenet
 
+  # Used by n8n only: list containers + restart them, nothing else (S2)
   docker-socket-proxy:
-    image: lscr.io/linuxserver/socket-proxy:latest
+    image: lscr.io/linuxserver/socket-proxy:3.4.7-r0-ls105
     container_name: docker-socket-proxy
     restart: unless-stopped
-    networks:
-      - securenet
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      CONTAINERS: 1      # list/inspect containers (daily report)
-      POST: 0            # v1.1 (S2): block every other write: create, delete, exec...
-      ALLOW_RESTARTS: 1  # v1.1 (S2): allow only stop/restart/kill
+      CONTAINERS: 1
+      POST: 0
+      ALLOW_RESTARTS: 1
+    networks:
+      - securenet
+
+  # Used by Homepage only: read-only container list, on an internal network (S3)
+  homepage-socket-proxy:
+    image: lscr.io/linuxserver/socket-proxy:3.4.7-r0-ls105
+    container_name: homepage-socket-proxy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CONTAINERS: 1
+      POST: 0
+    networks:
+      - homepage-docker
 
   uptime-kuma:
-    image: louislam/uptime-kuma:1
+    image: louislam/uptime-kuma:1.23.17
     container_name: uptime-kuma
     restart: unless-stopped
     ports:
@@ -66,38 +88,40 @@ services:
       - securenet
 
   homepage:
-    image: ghcr.io/gethomepage/homepage:latest
+    image: ghcr.io/gethomepage/homepage:v1.10.1
     container_name: homepage
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       HOMEPAGE_ALLOWED_HOSTS: "192.168.2.20:3000,192.168.2.20,localhost:3000"
+      HOMEPAGE_VAR_PIHOLE_KEY: ${HOMEPAGE_VAR_PIHOLE_KEY:?set in .env}
+      HOMEPAGE_VAR_NEXTCLOUD_TOKEN: ${HOMEPAGE_VAR_NEXTCLOUD_TOKEN:?set in .env}
     volumes:
       - ./homepage:/app/config
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./homepage/images:/app/public/images:ro
     networks:
       - securenet
+      - homepage-docker
 
-  # ✅ NEXTCLOUD (servicio adicional rúbrica)
   nextcloud-db:
-    image: mariadb:11
+    image: mariadb:11.8.6
     container_name: nextcloud-db
     restart: unless-stopped
     command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
     environment:
       TZ: Europe/Madrid
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set in .env}
       MYSQL_DATABASE: nextcloud
       MYSQL_USER: nextcloud
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set in .env}
     volumes:
       - nextcloud_db:/var/lib/mysql
     networks:
       - securenet
 
   nextcloud:
-    image: nextcloud:29-apache
+    image: nextcloud:29.0.16-apache   # Nextcloud 29 is end-of-life: upgrade path tracked for v2
     container_name: nextcloud
     restart: unless-stopped
     ports:
@@ -107,7 +131,7 @@ services:
       MYSQL_HOST: nextcloud-db
       MYSQL_DATABASE: nextcloud
       MYSQL_USER: nextcloud
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set in .env}
       PHP_MEMORY_LIMIT: 1024M
       PHP_UPLOAD_LIMIT: 1024M
     volumes:
@@ -120,6 +144,9 @@ services:
 networks:
   securenet:
     driver: bridge
+  homepage-docker:
+    driver: bridge
+    internal: true            # no route outside: only Homepage <-> its proxy
 
 volumes:
   portainer_data:

@@ -1,3 +1,6 @@
+# SecureNet v1.1 (D2): Pi-hole is this host's resolver; 1.1.1.1 is only a fallback
+# so that alerts (Telegram) still resolve if Pi-hole is down. The NAT adapter no
+# longer injects its own DNS servers.
 network:
   version: 2
   ethernets:
@@ -7,7 +10,11 @@ network:
         - 192.168.2.10/24
       nameservers:
         addresses:
-          - 8.8.8.8
+          - 127.0.0.1
           - 1.1.1.1
     enp0s8:
       dhcp4: true
+      dhcp4-overrides:
+        use-dns: false
+      ra-overrides:
+        use-dns: false

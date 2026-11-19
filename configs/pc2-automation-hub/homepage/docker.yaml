@@ -1,0 +1,6 @@
+# SecureNet v1.1 - container status for the dots on each card.
+# Read-only socket proxy (CONTAINERS=1, POST=0) on the internal "homepage-docker" network:
+# Homepage never touches /var/run/docker.sock directly (S3) and does not share n8n's proxy.
+securenet-docker:
+  host: homepage-socket-proxy
+  port: 2375

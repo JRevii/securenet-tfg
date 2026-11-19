@@ -1,0 +1,7 @@
+# /home/securenet-backup/.ssh/authorized_keys  (securenet-backup, 600)
+# The private key was generated on PC2, piped straight into an n8n "SSH Private Key"
+# credential and then shredded; only the public key stays on the server.
+#  - restrict:  no PTY, no port/agent/X11 forwarding
+#  - from:      only from the Docker "securenet" network (n8n)
+#  - command:   whatever n8n sends, sshd runs only the backup
+restrict,from="172.18.0.0/16",command="sudo -n /opt/securenet/backup.sh" ssh-ed25519 AAAA...<public key>... n8n -> securenet-backup (forced command)

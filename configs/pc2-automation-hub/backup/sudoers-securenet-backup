@@ -1,0 +1,3 @@
+# /etc/sudoers.d/securenet-backup  (root:root 440)
+# SecureNet v1.1 (S6): n8n triggers the backup over SSH; the key is restricted to this command.
+securenet-backup ALL=(root) NOPASSWD: /opt/securenet/backup.sh

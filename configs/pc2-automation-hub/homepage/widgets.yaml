@@ -1,22 +1,19 @@
----
+# SecureNet v1.1 - Homepage header widgets (https://gethomepage.dev/widgets/info/)
 - resources:
+    label: PC2
     cpu: true
     memory: true
     disk: /
+    uptime: true
 
 - datetime:
     text_size: xl
+    locale: es
     format:
       dateStyle: long
       timeStyle: short
+      hour12: false
 
 - search:
     provider: duckduckgo
     target: _blank
-
-- openmeteo:
-    label: Bilbao
-    latitude: 43.2630
-    longitude: -2.9350
-    units: metric
-    cache: 15
