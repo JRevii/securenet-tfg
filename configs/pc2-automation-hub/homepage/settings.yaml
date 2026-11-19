@@ -18,7 +18,7 @@ background:
   image: /images/background.svg
   opacity: 100
 
-# Three columns (Infraestructura nested in Monitorización, Gestión in Servicios);
+# Three columns (Gestión and Infraestructura nested in Servicios);
 # short titles so none of them wraps at 1920x1080
 layout:
   Seguridad:

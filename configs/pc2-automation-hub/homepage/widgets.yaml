@@ -11,13 +11,8 @@
     text: "SecureNet"
 
 - datetime:
-    text_size: xl
     locale: es
     format:
       dateStyle: long
       timeStyle: short
       hour12: false
-
-- search:
-    provider: duckduckgo
-    target: _blank

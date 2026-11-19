@@ -53,36 +53,7 @@
         server: securenet-docker
         container: n8n
 
-    # "Infraestructura" is nested under "Monitorización" (centre column): what runs behind
-    # the services, showing least privilege at a glance
-    - Infraestructura:
-        - MariaDB:
-            icon: mariadb.png
-            description: Base de datos de Nextcloud · sin puertos publicados
-            server: securenet-docker
-            container: nextcloud-db
-            showStats: true
-
-        - Proxy Docker de n8n:
-            icon: linuxserver-io.png
-            description: Solo listar y reiniciar (POST=0) · crear → 403
-            server: securenet-docker
-            container: docker-socket-proxy
-
-        - Proxy Docker de Homepage:
-            icon: linuxserver-io.png
-            description: Solo lectura, en una red interna aislada
-            server: securenet-docker
-            container: homepage-socket-proxy
-
-        - Homepage:
-            icon: homepage.png
-            description: Este panel · sin acceso directo al socket de Docker
-            server: securenet-docker
-            container: homepage
-            showStats: true
-
-# "Gestión" is nested inside "Servicios" so both share the third column
+# "Gestión" and "Infraestructura" are nested inside "Servicios" (right column)
 - Servicios:
     - Nextcloud:
         icon: nextcloud.png
@@ -103,3 +74,30 @@
             description: Parado por defecto · se arranca solo para tareas de administración
             server: securenet-docker
             container: portainer          # stopped -> grey dot (custom.css)
+
+    # "Infraestructura" is nested under "Servicios", below "Gestión" (right column):
+    # what runs behind the services, showing least privilege at a glance
+    - Infraestructura:
+        - MariaDB:
+            icon: mariadb.png
+            description: Base de datos de Nextcloud · sin puertos publicados
+            server: securenet-docker
+            container: nextcloud-db
+
+        - Proxy Docker de n8n:
+            icon: linuxserver-io.png
+            description: Solo listar y reiniciar (POST=0) · crear → 403
+            server: securenet-docker
+            container: docker-socket-proxy
+
+        - Proxy Docker de Homepage:
+            icon: linuxserver-io.png
+            description: Solo lectura, en una red interna aislada
+            server: securenet-docker
+            container: homepage-socket-proxy
+
+        - Homepage:
+            icon: homepage.png
+            description: Este panel · sin acceso directo al socket de Docker
+            server: securenet-docker
+            container: homepage
