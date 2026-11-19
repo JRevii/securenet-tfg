@@ -46,8 +46,7 @@ Closes the rest of the [post-delivery review](docs/08-security-review.md) that c
   - descriptions now match reality (Nextcloud is a demo service; remote VPN access is not proven yet, D1);
   - status dots for the PC1 services (ping to the gateway);
   - Portainer shows a grey "stopped" dot;
-  - *Gestión* sits under *Servicios*.
-  - New *Infraestructura* group under *Gestión* in the right column: MariaDB, both Docker socket proxies and Homepage itself, each with its status dot. Cards show only their own data (no container CPU/RAM/network); the Kuma widget shows sites up/down only, because its uptime % counts the time the VMs were powered off as downtime.
+  - New *Infraestructura* group under Nextcloud in the right column (*Gestión* sits under n8n in the centre column): MariaDB, both Docker socket proxies and Homepage itself, each with its status dot. Cards show only their own data (no container CPU/RAM/network); the Kuma widget shows sites up/down only, because its uptime % counts the time the VMs were powered off as downtime.
   - The UFW firewall gets its own card.
   - One row of links (repository, security review, status page, n8n executions); short group titles, no collapse chevrons, Portainer as a plain glyph, no search box; everything fits in 1920x1080 in three columns.
 

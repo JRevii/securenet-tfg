@@ -53,7 +53,16 @@
         server: securenet-docker
         container: n8n
 
-# "Gestión" and "Infraestructura" are nested inside "Servicios" (right column)
+    # "Gestión" is nested under "Monitorización", below n8n (centre column)
+    - Gestión:
+        - Portainer:
+            icon: si-portainer-#13BEF9    # Simple Icons glyph: no white tile behind it
+            href: https://192.168.2.20:9443
+            description: Parado por defecto · se arranca solo para tareas de administración
+            server: securenet-docker
+            container: portainer          # stopped -> grey dot (custom.css)
+
+# "Infraestructura" is nested inside "Servicios", below Nextcloud (right column)
 - Servicios:
     - Nextcloud:
         icon: nextcloud.png
@@ -67,15 +76,7 @@
           key: "{{HOMEPAGE_VAR_NEXTCLOUD_TOKEN}}"
           fields: ["freespace", "numfiles"]
 
-    - Gestión:
-        - Portainer:
-            icon: si-portainer-#13BEF9    # Simple Icons glyph: no white tile behind it
-            href: https://192.168.2.20:9443
-            description: Parado por defecto · se arranca solo para tareas de administración
-            server: securenet-docker
-            container: portainer          # stopped -> grey dot (custom.css)
-
-    # "Infraestructura" is nested under "Servicios", below "Gestión" (right column):
+    # "Infraestructura" is nested under "Servicios", below Nextcloud (right column):
     # what runs behind the services, showing least privilege at a glance
     - Infraestructura:
         - MariaDB:
