@@ -27,3 +27,14 @@ layout:
     icon: mdi-cloud-lock-outline
   Gestión:
     icon: mdi-tools
+  Infraestructura:
+    icon: mdi-docker
+  # bookmarks: four groups side by side under the services
+  Proyecto:
+    icon: mdi-source-repository
+  Estado y alertas:
+    icon: mdi-bell-ring-outline
+  Documentación técnica:
+    icon: mdi-book-open-variant
+  Plataforma:
+    icon: mdi-server-network

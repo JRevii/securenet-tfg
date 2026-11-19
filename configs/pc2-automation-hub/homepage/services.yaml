@@ -1,8 +1,8 @@
 # SecureNet v1.1 - Homepage services (https://gethomepage.dev/configs/services)
 # Widget secrets come from HOMEPAGE_VAR_* variables (/root/securenet/.env), never from this file.
-# Container status dots come from "securenet-docker" (docker.yaml): a read-only socket proxy.
-# PC1 services run on bare metal, so their dot is a ping to the gateway (host reachable),
-# not a per-service check. Uptime Kuma monitors Pi-hole itself.
+# Container status dots and CPU/RAM/network stats come from "securenet-docker" (docker.yaml):
+# a read-only socket proxy. PC1 services run on bare metal, so their dot is a ping to the
+# gateway (host reachable), not a per-service check; Uptime Kuma monitors Pi-hole itself.
 
 - Seguridad de red:
     - Pi-hole:
@@ -28,6 +28,10 @@
         description: Bloqueo de fuerza bruta SSH con alerta en Telegram · PC1
         ping: 192.168.2.10
 
+    - Firewall (UFW):
+        icon: mdi-wall-fire
+        description: Política por defecto denegar en PC1 y PC2 · Docker filtrado en DOCKER-USER
+
 - Monitorización y automatización:
     - Uptime Kuma:
         icon: uptime-kuma.png
@@ -35,6 +39,7 @@
         description: Comprobaciones cada 20 s y alertas directas a Telegram
         server: securenet-docker
         container: uptime-kuma
+        showStats: true
         widget:
           type: uptimekuma
           url: http://uptime-kuma:3001
@@ -46,6 +51,7 @@
         description: Autorrecuperación, alertas, escáner de red, backups e informe diario
         server: securenet-docker
         container: n8n
+        showStats: true
 
 # "Gestión" is nested inside "Servicios" so both share the third column
 - Servicios:
@@ -55,6 +61,7 @@
         description: Nube privada · servicio de prueba para las demos
         server: securenet-docker
         container: nextcloud
+        showStats: true
         widget:
           type: nextcloud
           url: http://192.168.2.20:8080
@@ -68,3 +75,31 @@
             description: Parado por defecto · se arranca solo para tareas de administración
             server: securenet-docker
             container: portainer          # stopped -> grey dot (custom.css)
+
+# What runs behind the services: shows least privilege at a glance
+- Infraestructura:
+    - MariaDB:
+        icon: mariadb.png
+        description: Base de datos de Nextcloud · sin puertos publicados
+        server: securenet-docker
+        container: nextcloud-db
+        showStats: true
+
+    - Proxy Docker de n8n:
+        icon: linuxserver-io.png
+        description: Solo listar y reiniciar (POST=0) · crear → 403
+        server: securenet-docker
+        container: docker-socket-proxy
+
+    - Proxy Docker de Homepage:
+        icon: linuxserver-io.png
+        description: Solo lectura, en una red interna aislada
+        server: securenet-docker
+        container: homepage-socket-proxy
+
+    - Homepage:
+        icon: homepage.png
+        description: Este panel · sin acceso directo al socket de Docker
+        server: securenet-docker
+        container: homepage
+        showStats: true

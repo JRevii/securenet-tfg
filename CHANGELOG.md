@@ -47,6 +47,9 @@ Closes the rest of the [post-delivery review](docs/08-security-review.md) that c
   - status dots for the PC1 services (ping to the gateway);
   - Portainer shows a grey "stopped" dot;
   - *Gestión* sits under *Servicios*.
+  - New *Infraestructura* column: MariaDB, both Docker socket proxies and Homepage itself, with live CPU/RAM/network per container read through the read-only proxy.
+  - The UFW firewall gets its own card.
+  - Bookmarks: project docs, status and alert pages, and official documentation of each tool.
 
 ### Still open
 

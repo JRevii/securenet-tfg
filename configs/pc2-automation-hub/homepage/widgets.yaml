@@ -6,6 +6,10 @@
     disk: /
     uptime: true
 
+- greeting:
+    text_size: xl
+    text: "SecureNet"
+
 - datetime:
     text_size: xl
     locale: es
